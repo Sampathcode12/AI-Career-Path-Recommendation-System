@@ -1,0 +1,65 @@
+================================================================================
+DATABASE CONNECTION STRING LOCATIONS
+================================================================================
+
+PRIMARY LOCATION (RECOMMENDED):
+-------------------------------
+File: .env
+Path: C:\Project\AI-Career-Path-Recommendation-System\Back-End\.env
+
+ACTION: Create this file and add your connection string here!
+
+Example .env file content:
+---------------------------
+DATABASE_URL=mssql+pyodbc://sa:YourPassword@localhost:1433/career_recommendation?driver=ODBC+Driver+17+for+SQL+Server
+SECRET_KEY=your-secret-key-here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+
+SECONDARY LOCATION (DEFAULT):
+------------------------------
+File: config.py
+Path: C:\Project\AI-Career-Path-Recommendation-System\Back-End\config.py
+Line: 9
+
+This is the default value if .env file doesn't exist.
+
+
+HOW IT WORKS:
+-------------
+1. Backend first looks for .env file
+2. If .env exists, uses connection string from there
+3. If .env doesn't exist, uses default from config.py
+4. Connection string flows: .env → config.py → database.py → main.py
+
+
+FILE STRUCTURE:
+---------------
+Back-End/
+├── .env              ← 🔴 CREATE THIS FILE - Put connection string here
+├── config.py         ← Reads from .env
+├── database.py       ← Uses connection string
+└── main.py           ← Uses database connection
+
+
+QUICK SETUP:
+------------
+1. Go to: C:\Project\AI-Career-Path-Recommendation-System\Back-End
+2. Create file: .env
+3. Add: DATABASE_URL=mssql+pyodbc://sa:password@localhost:1433/career_recommendation?driver=ODBC+Driver+17+for+SQL+Server
+4. Save file
+5. Run: python run.py
+
+
+CONNECTION STRING FORMAT:
+-------------------------
+mssql+pyodbc://username:password@server:port/database?driver=ODBC+Driver+17+for+SQL+Server
+
+Example:
+mssql+pyodbc://sa:MyPassword123@localhost:1433/career_recommendation?driver=ODBC+Driver+17+for+SQL+Server
+
+
+================================================================================
+
+

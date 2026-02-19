@@ -1,0 +1,21 @@
+footer {
+  text-align: center;
+  padding: var(--spacing-lg) var(--spacing-md);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: rgba(255, 255, 255, 0.9);
+  margin-top: auto;
+  font-size: 0.875rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 10;
+}
+
+footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.5), transparent);
+}
