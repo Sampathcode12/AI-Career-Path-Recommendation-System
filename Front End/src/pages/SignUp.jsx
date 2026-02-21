@@ -59,8 +59,8 @@ const SignUp = () => {
       // Call backend API to create account
       await signup(formData.name, formData.email, formData.password);
       
-      // Success - redirect to home
-      navigate('/home');
+      // Success - redirect to sign-in page so user can log in with their credentials
+      navigate('/login');
     } catch (err) {
       // Handle error from backend
       setError(err.message || 'Sign up failed. Please try again.');

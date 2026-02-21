@@ -35,6 +35,10 @@ public class AuthService : IAuthService
         _db.Users.Add(user);
         await _db.SaveChangesAsync(ct);
 
+        // Record first sign-in (sign-up) in UserSignInDetails
+        _db.UserSignInDetails.Add(new UserSignInDetail { UserId = user.Id, Email = user.Email, SignedInAt = DateTime.UtcNow });
+        await _db.SaveChangesAsync(ct);
+
         var userResponse = new UserResponse(user.Id, user.Name, user.Email);
         var token = GenerateJwt(user);
         return new AuthResponse(token, userResponse);
@@ -45,6 +49,10 @@ public class AuthService : IAuthService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email, ct);
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return null;
+
+        // Save sign-in details (aligned with frontend login: email + timestamp)
+        _db.UserSignInDetails.Add(new UserSignInDetail { UserId = user.Id, Email = request.Email, SignedInAt = DateTime.UtcNow });
+        await _db.SaveChangesAsync(ct);
 
         var userResponse = new UserResponse(user.Id, user.Name, user.Email);
         var token = GenerateJwt(user);

@@ -47,15 +47,8 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (name, email, password) => {
     try {
-      // Create account; backend returns same shape as login (access_token, user)
-      const response = await authAPI.signup({ name, email, password });
-      if (response?.access_token && response?.user) {
-        localStorage.setItem('access_token', response.access_token);
-        setUser(response.user);
-        return response;
-      }
-      // Fallback: auto login after signup
-      return await login(email, password);
+      // Create account only; do not log in — user must sign in on login page
+      await authAPI.signup({ name, email, password });
     } catch (error) {
       throw error;
     }

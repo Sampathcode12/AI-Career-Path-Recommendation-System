@@ -9,6 +9,7 @@ public class ApplicationDbContext : DbContext
         : base(options) { }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserSignInDetail> UserSignInDetails => Set<UserSignInDetail>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<Assessment> Assessments => Set<Assessment>();
     public DbSet<CareerRecommendation> CareerRecommendations => Set<CareerRecommendation>();
@@ -20,6 +21,12 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<User>(e =>
         {
             e.HasIndex(u => u.Email).IsUnique();
+        });
+        modelBuilder.Entity<UserSignInDetail>(e =>
+        {
+            e.HasOne(s => s.User).WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(s => s.UserId);
+            e.HasIndex(s => s.SignedInAt);
         });
         modelBuilder.Entity<UserProfile>(e =>
         {
