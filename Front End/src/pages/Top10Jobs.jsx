@@ -384,6 +384,26 @@ const ALL_JOBS = [
       step(5, 'Target role', 'Senior teacher, department head, or move to leadership (e.g. principal). Optional: Master\'s in Education.'),
     ],
   },
+  {
+    id: 18,
+    rank: 18,
+    title: 'Accountant',
+    sector: 'Finance & Accounting',
+    category: 'Finance',
+    salary: '$45,000 – $95,000',
+    growth: '+6%',
+    description: 'Prepare and examine financial records, ensure accuracy, and support tax and compliance. Works in firms, corporations, and public sector worldwide.',
+    regions: 'USA, UK, EU, India, Australia, Canada, Singapore',
+    skills: ['Financial reporting', 'Bookkeeping', 'Tax preparation', 'Excel & accounting software', 'GAAP/IFRS', 'Attention to detail', 'Analytical thinking', 'Audit support'],
+    qualifications: { education: "Bachelor's in Accounting, Finance, or related; some roles require Master's or CPA track", experience: '0–4+ years; internships count for entry level', certifications: 'CPA (US), ACCA, CIMA, CA (varies by country)' },
+    careerPathSteps: [
+      step(1, 'Foundation', 'Strong math and analytical skills. High school diploma; some take accounting or business courses.'),
+      step(2, 'Education', "Bachelor's in Accounting or Finance (4 years). Optional: Master's in Accounting or MBA for advancement."),
+      step(3, 'Entry level', 'Staff Accountant or Junior Accountant (0–2 years). Bookkeeping, reconciliations, and reporting.'),
+      step(4, 'Mid level', 'Accountant or Senior Accountant (2–5+ years). Lead month-end close, tax filings, or audit. Optional: CPA/ACCA.'),
+      step(5, 'Target role', 'Senior Accountant, Controller, or move to Financial Manager. CPA or equivalent often required for senior roles.'),
+    ],
+  },
 ];
 
 const JOB_CATEGORIES = ['All', 'Technology', 'Healthcare', 'Finance', 'Sports', 'Transportation', 'Creative', 'Education', 'Business'];
@@ -415,6 +435,7 @@ const Top10Jobs = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedJobIds, setSelectedJobIds] = useState(new Set());
   const [showSkillsPanel, setShowSkillsPanel] = useState(false);
+  const [showComparePanel, setShowComparePanel] = useState(false);
 
   const filteredJobs = useMemo(
     () => ALL_JOBS.filter((j) => matchCategory(j, selectedCategory) && matchSearch(j, searchTerm)),
@@ -584,16 +605,105 @@ const Top10Jobs = () => {
           }}
         >
           <span style={{ fontWeight: '600', color: 'var(--primary-color)' }}>
-            {selectedJobIds.size} job(s) selected — view skills, qualifications & career path
+            {selectedJobIds.size} job(s) selected — view details or compare main benefits
           </span>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button onClick={() => setShowSkillsPanel(true)}>View skills, qualifications & career path</button>
+            <button onClick={() => { setShowSkillsPanel(true); setShowComparePanel(false); }}>View skills & career path</button>
+            <button
+              onClick={() => { setShowComparePanel(true); setShowSkillsPanel(false); }}
+              style={{ background: 'rgba(6, 182, 212, 0.9)', color: 'white' }}
+            >
+              Compare benefits
+            </button>
             <button
               onClick={() => setSelectedJobIds(new Set())}
               style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
             >
               Clear selection
             </button>
+          </div>
+        </div>
+      )}
+
+      {showComparePanel && selectedJobs.length > 0 && (
+        <div className="card" style={{ marginTop: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0 }}>Compare main benefits</h3>
+            <button
+              onClick={() => setShowComparePanel(false)}
+              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
+            >
+              Close
+            </button>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', marginBottom: '1.25rem' }}>
+            Side-by-side comparison of key benefits for your selected jobs. Use this to decide which role fits you best.
+          </p>
+          <div style={{ overflowX: 'auto', width: '100%' }}>
+            <table style={{ width: '100%', minWidth: '500px', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                  <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', color: 'var(--primary-color)', width: '140px', verticalAlign: 'top' }}>Benefit</th>
+                  {selectedJobs.map((job) => (
+                    <th key={job.id} style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', color: 'var(--secondary-color)', minWidth: '180px', verticalAlign: 'top' }}>
+                      {job.title}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Salary (global)</td>
+                  {selectedJobs.map((job) => (
+                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{job.salary}</td>
+                  ))}
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Growth</td>
+                  {selectedJobs.map((job) => (
+                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{job.growth}</td>
+                  ))}
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Sector / Category</td>
+                  {selectedJobs.map((job) => (
+                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{job.sector} · {job.category || '—'}</td>
+                  ))}
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Key skills</td>
+                  {selectedJobs.map((job) => (
+                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                      {job.skills.slice(0, 4).join('; ')}{job.skills.length > 4 ? ' …' : ''}
+                    </td>
+                  ))}
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Education</td>
+                  {selectedJobs.map((job) => (
+                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{job.qualifications.education}</td>
+                  ))}
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Experience</td>
+                  {selectedJobs.map((job) => (
+                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{job.qualifications.experience}</td>
+                  ))}
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Certifications</td>
+                  {selectedJobs.map((job) => (
+                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{job.qualifications.certifications}</td>
+                  ))}
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Top regions</td>
+                  {selectedJobs.map((job) => (
+                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{job.regions}</td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
