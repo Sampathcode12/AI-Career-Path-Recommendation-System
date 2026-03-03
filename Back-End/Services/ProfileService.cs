@@ -27,6 +27,10 @@ public class ProfileService : IProfileService
             ExperienceLevel = request.ExperienceLevel,
             Education = request.Education,
             PreferredIndustries = request.PreferredIndustries,
+            Location = request.Location,
+            Bio = request.Bio,
+            LinkedInUrl = request.LinkedInUrl,
+            PortfolioUrl = request.PortfolioUrl,
             UpdatedAt = DateTime.UtcNow
         };
         _db.UserProfiles.Add(profile);
@@ -44,11 +48,15 @@ public class ProfileService : IProfileService
         profile.ExperienceLevel = request.ExperienceLevel ?? profile.ExperienceLevel;
         profile.Education = request.Education ?? profile.Education;
         profile.PreferredIndustries = request.PreferredIndustries ?? profile.PreferredIndustries;
+        profile.Location = request.Location ?? profile.Location;
+        profile.Bio = request.Bio ?? profile.Bio;
+        profile.LinkedInUrl = request.LinkedInUrl ?? profile.LinkedInUrl;
+        profile.PortfolioUrl = request.PortfolioUrl ?? profile.PortfolioUrl;
         profile.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
         return ToResponse(profile);
     }
 
     private static ProfileResponse ToResponse(UserProfile p) =>
-        new(p.Id, p.UserId, p.Skills, p.Interests, p.ExperienceLevel, p.Education, p.PreferredIndustries, p.UpdatedAt);
+        new(p.Id, p.UserId, p.Skills, p.Interests, p.ExperienceLevel, p.Education, p.PreferredIndustries, p.Location, p.Bio, p.LinkedInUrl, p.PortfolioUrl, p.UpdatedAt);
 }

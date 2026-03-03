@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { profileAPI } from '../services/api';
 import './PageStyles.css';
 
 const Profile = () => {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [formData, setFormData] = useState({
     fullName: user?.name || '',
     email: user?.email || '',
@@ -16,41 +19,106 @@ const Profile = () => {
     linkedIn: '',
     portfolio: '',
   });
-
   const [profileProgress, setProfileProgress] = useState(0);
+  const [hasExistingProfile, setHasExistingProfile] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    // Load saved profile data
-    const savedProfile = localStorage.getItem('userProfile');
-    if (savedProfile) {
-      const parsed = JSON.parse(savedProfile);
-      setFormData(parsed);
-    }
-    calculateProgress();
+  const calculateProgress = useCallback((data) => {
+    const fields = ['fullName', 'email', 'educationLevel', 'currentRole', 'skills', 'interests', 'bio'];
+    const filledFields = fields.filter(field => data[field] && String(data[field]).trim() !== '').length;
+    return Math.round((filledFields / fields.length) * 100);
   }, []);
 
-  const calculateProgress = () => {
-    const fields = ['fullName', 'email', 'educationLevel', 'currentRole', 'skills', 'interests', 'bio'];
-    const filledFields = fields.filter(field => formData[field] && formData[field].trim() !== '').length;
-    const progress = Math.round((filledFields / fields.length) * 100);
-    setProfileProgress(progress);
-    localStorage.setItem('profileProgress', progress.toString());
-  };
+  useEffect(() => {
+    if (!user) return;
+    setFormData(prev => ({ ...prev, fullName: user.name || '', email: user.email || '' }));
+  }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProfile() {
+      setLoading(true);
+      setError('');
+      try {
+        const profile = await profileAPI.get();
+        if (cancelled) return;
+        setHasExistingProfile(true);
+        setFormData(prev => ({
+          ...prev,
+          educationLevel: profile.education ?? '',
+          currentRole: profile.experience_level ?? '',
+          location: profile.location ?? '',
+          skills: profile.skills ?? '',
+          interests: profile.interests ?? '',
+          bio: profile.bio ?? '',
+          linkedIn: profile.linked_in_url ?? '',
+          portfolio: profile.portfolio_url ?? '',
+        }));
+      } catch (err) {
+        if (cancelled) return;
+        if (err.status === 401) {
+          logout();
+          navigate('/login', { replace: true });
+          return;
+        }
+        if (err.message?.includes('404') || err.message?.toLowerCase().includes('not found')) {
+          setHasExistingProfile(false);
+        } else {
+          setError(err.message || 'Failed to load profile');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    loadProfile();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    setProfileProgress(calculateProgress(formData));
+  }, [formData, calculateProgress]);
 
   const handleChange = (e) => {
-    const newData = {
-      ...formData,
-      [e.target.name]: e.target.value
-    };
+    const newData = { ...formData, [e.target.name]: e.target.value };
     setFormData(newData);
-    calculateProgress();
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    localStorage.setItem('userProfile', JSON.stringify(formData));
-    calculateProgress();
-    alert('Profile saved successfully!');
+    setSaving(true);
+    setError('');
+    try {
+      const payload = {
+        education: formData.educationLevel || null,
+        experience_level: formData.currentRole || null,
+        location: formData.location || null,
+        skills: formData.skills || null,
+        interests: formData.interests || null,
+        bio: formData.bio || null,
+        linked_in_url: formData.linkedIn || null,
+        portfolio_url: formData.portfolio || null,
+        preferred_industries: null,
+      };
+      if (hasExistingProfile) {
+        await profileAPI.update(payload);
+      } else {
+        await profileAPI.create(payload);
+        setHasExistingProfile(true);
+      }
+      setProfileProgress(calculateProgress(formData));
+      alert('Profile saved successfully!');
+    } catch (err) {
+      if (err.status === 401) {
+        logout();
+        navigate('/login', { replace: true });
+        return;
+      }
+      setError(err.message || 'Failed to save profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const skillTags = formData.skills ? formData.skills.split(',').map(s => s.trim()).filter(s => s) : [];
@@ -92,6 +160,8 @@ const Profile = () => {
       {/* Main Profile Form */}
       <div className="card">
         <h2>User Profile</h2>
+        {loading && <p style={{ color: 'var(--text-secondary)' }}>Loading profile...</p>}
+        {error && <div className="error-message" style={{ marginBottom: '1rem' }}>{error}</div>}
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
             <div className="form-group">
@@ -231,7 +301,9 @@ const Profile = () => {
             />
           </div>
 
-          <button type="submit">Save Profile</button>
+          <button type="submit" disabled={loading || saving}>
+            {saving ? 'Saving...' : 'Save Profile'}
+          </button>
         </form>
       </div>
     </section>

@@ -72,7 +72,7 @@ Or with Windows auth:
      ```
      This **creates the database** with the given name if it does not exist, and **creates or updates all tables** to match your models.
    - When you run the API (`dotnet run`), any **pending migrations are applied automatically** on startup.
-   - **Sign-in / sign-up**: The **`Users`** table (from the initial migration) stores user details for authentication: `Id`, `Name`, `Email`, `PasswordHash`, `CreatedAt`. Sign up and sign in use this table; JWT is issued after successful login or registration.
+   - **Sign-in / sign-up**: The **`Users`** table stores account details: `Id`, `Name`, `Email`, `PasswordHash`, `CreatedAt`. The **`UserSignInDetails`** table stores each sign-in event (aligned with the frontend): `UserId`, `Email` (used to sign in), `SignedInAt`. When you run the backend, pending migrations are applied and **migration history** (`__EFMigrationsHistory`) is updated automatically.
    - After changing models (add/remove entities or properties), add a migration and update:
      ```bash
      dotnet ef migrations add YourMigrationName

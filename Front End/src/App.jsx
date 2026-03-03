@@ -13,6 +13,7 @@ import Assessment from './pages/Assessment';
 import Recommendation from './pages/Recommendation';
 import Dashboard from './pages/Dashboard';
 import JobSearch from './pages/JobSearch';
+import Top10Jobs from './pages/Top10Jobs';
 import './App.css';
 
 const AppRoutes = () => {
@@ -89,6 +90,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute>
                 <JobSearch />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/top-jobs"
+            element={
+              <ProtectedRoute>
+                <Top10Jobs />
               </ProtectedRoute>
             }
           />

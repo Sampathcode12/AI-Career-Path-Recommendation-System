@@ -8,6 +8,10 @@ public record ProfileResponse(
     string? ExperienceLevel,
     string? Education,
     string? PreferredIndustries,
+    string? Location,
+    string? Bio,
+    string? LinkedInUrl,
+    string? PortfolioUrl,
     DateTime? UpdatedAt);
 
 public record ProfileCreateOrUpdateRequest(
@@ -15,4 +19,8 @@ public record ProfileCreateOrUpdateRequest(
     string? Interests,
     string? ExperienceLevel,
     string? Education,
-    string? PreferredIndustries);
+    string? PreferredIndustries,
+    string? Location,
+    string? Bio,
+    string? LinkedInUrl,
+    string? PortfolioUrl);

@@ -3,13 +3,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 // Helper function for API calls
 async function apiCall(endpoint, options = {}) {
   const token = localStorage.getItem('access_token');
-  
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+
   const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
     ...options,
+    headers,
   };
 
   if (options.body && typeof options.body === 'object') {
@@ -21,7 +23,9 @@ async function apiCall(endpoint, options = {}) {
     
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'API request failed' }));
-      throw new Error(error.detail || 'API request failed');
+      const err = new Error(error.detail || 'API request failed');
+      err.status = response.status;
+      throw err;
     }
     
     return await response.json();
