@@ -1,37 +1,45 @@
 import React from 'react';
 
-// Target/Goal Icon
+// Target/Goal Icon — compact bullseye
 export const TargetIcon = ({ size = 24, color = 'currentColor', className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2" fill="none"/>
-    <circle cx="12" cy="12" r="6" stroke={color} strokeWidth="2" fill="none"/>
-    <circle cx="12" cy="12" r="2" fill={color}/>
+    <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.75" fill="none"/>
+    <circle cx="12" cy="12" r="5" stroke={color} strokeWidth="1.75" fill="none"/>
+    <circle cx="12" cy="12" r="2.5" fill={color}/>
   </svg>
 );
 
-// Chart/Statistics Icon
+// Chart/Statistics Icon — bar chart
 export const ChartIcon = ({ size = 24, color = 'currentColor', className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <rect x="3" y="13" width="4" height="6" rx="1" fill={color}/>
-    <rect x="8" y="9" width="4" height="10" rx="1" fill={color}/>
-    <rect x="13" y="5" width="4" height="14" rx="1" fill={color}/>
-    <rect x="18" y="11" width="4" height="8" rx="1" fill={color}/>
+    <rect x="4" y="14" width="3" height="6" rx="1" fill={color}/>
+    <rect x="10" y="10" width="3" height="10" rx="1" fill={color}/>
+    <rect x="16" y="6" width="3" height="14" rx="1" fill={color}/>
   </svg>
 );
 
-// Book/Learning Icon
+// Checklist / Skills assessed
+export const ChecklistIcon = ({ size = 24, color = 'currentColor', className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <path d="M9 11l3 3 6-6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h8a2 2 0 012 2v1" stroke={color} strokeWidth="1.75" strokeLinecap="round" fill="none"/>
+  </svg>
+);
+
+// Book/Learning Icon — open book
 export const BookIcon = ({ size = 24, color = 'currentColor', className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <path d="M4 19.5C4 18.837 4.263 18.201 4.732 17.732C5.201 17.263 5.837 17 6.5 17H20" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M6.5 2H20V22H6.5C5.837 22 5.201 21.737 4.732 21.268C4.263 20.799 4 20.163 4 19.5V4.5C4 3.837 4.263 3.201 4.732 2.732C5.201 2.263 5.837 2 6.5 2Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M12 5v14M4 6.5C4 5.67 5.5 5 7 5s3 .67 3 1.5v11c0 .83-1.5 1.5-3 1.5s-3-.67-3-1.5V6.5z" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M20 6.5c0-.83-1.5-1.5-3-1.5s-3 .67-3 1.5v11c0 .83 1.5 1.5 3 1.5s3-.67 3-1.5V6.5z" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
 // Briefcase/Job Icon
 export const BriefcaseIcon = ({ size = 24, color = 'currentColor', className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <rect x="2" y="7" width="20" height="14" rx="2" stroke={color} strokeWidth="2"/>
-    <path d="M16 21V5C16 4.46957 15.7893 3.96086 15.4142 3.58579C15.0391 3.21071 14.5304 3 14 3H10C9.46957 3 8.96086 3.21071 8.58579 3.58579C8.21071 3.96086 8 4.46957 8 5V21" stroke={color} strokeWidth="2"/>
+    <rect x="4" y="8" width="16" height="12" rx="1.5" stroke={color} strokeWidth="1.75" fill="none"/>
+    <path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M8 14h.01M16 14h.01" stroke={color} strokeWidth="2" strokeLinecap="round"/>
   </svg>
 );
 
@@ -110,6 +118,21 @@ export const FileIcon = ({ size = 24, color = 'currentColor', className = '' }) 
 export const StarIcon = ({ size = 24, color = 'currentColor', className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Chat / Message Icon
+export const ChatIcon = ({ size = 24, color = 'currentColor', className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Close / Minimize Icon
+export const CloseIcon = ({ size = 24, color = 'currentColor', className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <line x1="18" y1="6" x2="6" y2="18" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+    <line x1="6" y1="6" x2="18" y2="18" stroke={color} strokeWidth="2" strokeLinecap="round"/>
   </svg>
 );
 

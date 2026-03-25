@@ -8,17 +8,16 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in from token
     const token = localStorage.getItem('access_token');
     if (token) {
-      // Verify token by getting current user
       authAPI.getCurrentUser()
         .then(userData => {
           setUser(userData);
         })
-        .catch(() => {
-          // Token is invalid, clear it
-          localStorage.removeItem('access_token');
+        .catch((err) => {
+          if (err?.status === 401) {
+            localStorage.removeItem('access_token');
+          }
           setUser(null);
         })
         .finally(() => {

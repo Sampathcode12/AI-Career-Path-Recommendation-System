@@ -1,0 +1,159 @@
+/* Profile page - Education & User Interests sections */
+.profile-section {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(13, 115, 119, 0.06) 0%, rgba(13, 115, 119, 0.02) 100%);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(13, 115, 119, 0.2);
+}
+
+.profile-section-title {
+  margin: 0 0 1.25rem 0;
+  font-size: 1.125rem;
+  color: var(--accent);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-section-title::before {
+  content: '';
+  width: 4px;
+  height: 1.25em;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.profile-edu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.profile-edu-grid .form-group {
+  margin-bottom: 0;
+}
+
+.profile-edu-full {
+  grid-column: 1 / -1;
+}
+
+.profile-edu-entry {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.profile-edu-entry:last-of-type {
+  margin-bottom: 1rem;
+}
+
+.profile-edu-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.profile-edu-entry-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.profile-edu-remove {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profile-edu-remove:hover {
+  color: #dc2626;
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.profile-edu-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: rgba(13, 115, 119, 0.08);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profile-edu-add:hover {
+  background: rgba(13, 115, 119, 0.12);
+}
+
+.profile-industry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.profile-industry-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.profile-industry-chip:hover {
+  background: rgba(13, 115, 119, 0.06);
+}
+
+.profile-industry-chip.selected {
+  background: rgba(13, 115, 119, 0.12);
+  border-color: var(--accent);
+}
+
+.profile-industry-chip input {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.profile-interests-textarea {
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .profile-section {
+    padding: 1rem;
+  }
+
+  .profile-edu-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-industry-grid {
+    max-height: 200px;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}

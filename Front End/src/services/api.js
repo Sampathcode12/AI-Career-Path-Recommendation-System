@@ -81,6 +81,10 @@ export const recommendationsAPI = {
   save: (id, saved) => apiCall(`/recommendations/${id}/save?saved=${saved}`, {
     method: 'PUT',
   }),
+  chat: (message, conversationHistory = []) => apiCall('/recommendations/chat', {
+    method: 'POST',
+    body: { message, conversation_history: conversationHistory },
+  }),
 };
 
 // Jobs API
@@ -89,11 +93,17 @@ export const jobsAPI = {
     method: 'POST',
     body: filters,
   }),
+  getTop: (category, limit = 10) => apiCall(`/jobs/top?category=${encodeURIComponent(category || '')}&limit=${limit}`),
   getSaved: () => apiCall('/jobs/saved'),
   save: (jobData) => apiCall('/jobs/save', {
     method: 'POST',
     body: jobData,
   }),
+};
+
+// Skill Gap API
+export const skillGapAPI = {
+  getAll: (industry) => apiCall(`/skill-gap${industry ? `?industry=${encodeURIComponent(industry)}` : ''}`),
 };
 
 // Market Trends API

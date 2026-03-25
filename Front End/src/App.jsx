@@ -14,6 +14,7 @@ import Recommendation from './pages/Recommendation';
 import Dashboard from './pages/Dashboard';
 import JobSearch from './pages/JobSearch';
 import Top10Jobs from './pages/Top10Jobs';
+import SkillGap from './pages/SkillGap';
 import './App.css';
 
 const AppRoutes = () => {
@@ -98,6 +99,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute>
                 <Top10Jobs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/skill-gap"
+            element={
+              <ProtectedRoute>
+                <SkillGap />
               </ProtectedRoute>
             }
           />

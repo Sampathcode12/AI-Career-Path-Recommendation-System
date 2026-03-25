@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Doughnut, Line } from 'react-chartjs-2';
-import { TargetIcon, ChartIcon, BookIcon, BriefcaseIcon, SearchIcon, TrendingUpIcon } from '../components/Icons';
+import { TargetIcon, ChecklistIcon, BookIcon, BriefcaseIcon, SearchIcon, TrendingUpIcon, ChartIcon } from '../components/Icons';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -61,8 +61,8 @@ const Home = () => {
       {
         data: [profileProgress, 100 - profileProgress],
         backgroundColor: [
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(226, 232, 240, 0.8)',
+          'rgba(13, 115, 119, 0.85)',
+          'rgba(224, 221, 216, 0.9)',
         ],
         borderWidth: 0,
       },
@@ -75,8 +75,8 @@ const Home = () => {
       {
         label: 'Skill Growth',
         data: [20, 35, 45, 50, 60, 75],
-        borderColor: 'rgba(59, 130, 246, 1)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: 'rgba(13, 115, 119, 1)',
+        backgroundColor: 'rgba(13, 115, 119, 0.08)',
         fill: true,
         tension: 0.4,
       },
@@ -85,7 +85,7 @@ const Home = () => {
 
   const quickStats = [
     { label: 'Recommended Careers', value: '3', icon: TargetIcon },
-    { label: 'Skills Assessed', value: '8', icon: ChartIcon },
+    { label: 'Skills Assessed', value: '8', icon: ChecklistIcon },
     { label: 'Learning Paths', value: '5', icon: BookIcon },
     { label: 'Job Matches', value: '12', icon: BriefcaseIcon },
   ];
@@ -95,11 +95,11 @@ const Home = () => {
       <div className="card">
         <h2>Welcome{user?.name ? `, ${user.name}` : ''}</h2>
         <p>
-          Your personalized career journey dashboard. Track your progress, discover opportunities, and achieve your career goals.
+          Your personalized career journey. This scalable web-based system offers real-time job market analysis, multi-career path exploration, AI-based recommendations, and industry skill gap analysis.
         </p>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
           <button onClick={handleGetStarted}>Complete Your Profile</button>
-          <button onClick={handleAssessment} style={{ background: 'var(--accent-color)' }}>
+          <button onClick={handleAssessment}>
             {assessmentCompleted ? 'Retake Assessment' : 'Take Assessment'}
           </button>
         </div>
@@ -128,7 +128,7 @@ const Home = () => {
               textAlign: 'center',
               fontSize: '2rem',
               fontWeight: 'bold',
-              color: 'var(--secondary-color)'
+              color: 'var(--accent)'
             }}>
               {profileProgress}%
             </div>
@@ -149,7 +149,7 @@ const Home = () => {
                 <div style={{
                   width: `${profileProgress}%`,
                   height: '100%',
-                  background: 'linear-gradient(90deg, var(--secondary-color), var(--accent-color))',
+                  background: 'var(--accent)',
                   transition: 'width 0.3s ease'
                 }}></div>
               </div>
@@ -170,9 +170,9 @@ const Home = () => {
             return (
               <div key={index} className="stat-card">
                 <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-                  <IconComponent size={40} color="var(--secondary-color)" />
+                  <IconComponent size={40} color="var(--accent)" />
                 </div>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--secondary-color)', marginBottom: '0.25rem' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--accent)', marginBottom: '0.25rem' }}>
                   {stat.value}
                 </div>
                 <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{stat.label}</div>
@@ -196,7 +196,7 @@ const Home = () => {
                   display: false,
                 },
                 tooltip: {
-                  backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                  backgroundColor: 'rgba(26, 26, 26, 0.95)',
                   padding: 12,
                   titleFont: { size: 14, weight: 600 },
                   bodyFont: { size: 13 },
@@ -217,6 +217,18 @@ const Home = () => {
             }}
           />
         </div>
+      </div>
+
+      {/* System features */}
+      <div className="card">
+        <h3>System Features</h3>
+        <ul style={{ marginBottom: '1rem', paddingLeft: '1.25rem', color: 'var(--text-secondary)' }}>
+          <li><strong style={{ color: 'var(--text)' }}>Real-Time Job Market Analysis</strong> — Market Trends page</li>
+          <li><strong style={{ color: 'var(--text)' }}>Multi-Career Path Exploration</strong> — Recommendation & Top 10 Jobs</li>
+          <li><strong style={{ color: 'var(--text)' }}>Scalable Web-Based System</strong> — React + .NET API</li>
+          <li><strong style={{ color: 'var(--text)' }}>AI-Based Career Recommendation</strong> — Generate personalized careers</li>
+          <li><strong style={{ color: 'var(--text)' }}>Industry Skill Gap Analysis</strong> — Skill Gap page</li>
+        </ul>
       </div>
 
       {/* Quick Actions */}
@@ -243,6 +255,13 @@ const Home = () => {
           >
             <TrendingUpIcon size={32} color="white" />
             <span>Market Trends</span>
+          </button>
+          <button
+            onClick={() => navigate('/skill-gap')}
+            style={{ padding: '1.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <ChartIcon size={32} color="white" />
+            <span>Skill Gap Analysis</span>
           </button>
         </div>
       </div>

@@ -34,8 +34,8 @@ const Dashboard = () => {
       {
         label: 'Data Science Jobs',
         data: [100, 115, 130, 145, 165, 185],
-        borderColor: 'rgba(59, 130, 246, 1)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: 'rgba(13, 115, 119, 1)',
+        backgroundColor: 'rgba(13, 115, 119, 0.08)',
         fill: true,
         tension: 0.4,
       },
@@ -56,7 +56,7 @@ const Dashboard = () => {
       {
         data: [40, 25, 20, 15],
         backgroundColor: [
-          'rgba(59, 130, 246, 0.8)',
+          'rgba(13, 115, 119, 0.85)',
           'rgba(6, 182, 212, 0.8)',
           'rgba(139, 92, 246, 0.8)',
           'rgba(16, 185, 129, 0.8)',
@@ -84,9 +84,9 @@ const Dashboard = () => {
   return (
     <section className="page-section">
       <div className="card">
-        <h2>Job Market Trends & Insights</h2>
+        <h2>Real-Time Job Market Analysis</h2>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-          Real-time market data and trends to help you make informed career decisions.
+          Live job market data and trends — demand growth, salary ranges, trending skills — to help you make informed career decisions.
         </p>
 
         {/* Market Demand Chart */}
@@ -154,9 +154,9 @@ const Dashboard = () => {
         <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
           <div className="card stat-card">
             <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-              <ChartIcon size={40} color="var(--secondary-color)" />
+              <ChartIcon size={40} color="var(--accent)" />
             </div>
-            <h3 style={{ margin: '0.5rem 0', fontSize: '2rem', color: 'var(--secondary-color)' }}>$95,000</h3>
+            <h3 style={{ margin: '0.5rem 0', fontSize: '2rem', color: 'var(--accent)' }}>$95,000</h3>
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Average Salary</p>
             <p style={{ margin: '0.5rem 0 0 0', color: 'var(--success-color)', fontSize: '0.875rem', fontWeight: '600' }}>
               +15% from last year
@@ -166,7 +166,7 @@ const Dashboard = () => {
             <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
               <TrendingUpIcon size={40} color="var(--accent-color)" />
             </div>
-            <h3 style={{ margin: '0.5rem 0', fontSize: '2rem', color: 'var(--accent-color)' }}>+18%</h3>
+            <h3 style={{ margin: '0.5rem 0', fontSize: '2rem', color: 'var(--accent)' }}>+18%</h3>
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Yearly Growth</p>
             <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
               Job market expansion
@@ -174,9 +174,9 @@ const Dashboard = () => {
           </div>
           <div className="card stat-card">
             <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-              <GlobeIcon size={40} color="var(--secondary-color)" />
+              <GlobeIcon size={40} color="var(--accent)" />
             </div>
-            <h3 style={{ margin: '0.5rem 0', fontSize: '2rem', color: 'var(--secondary-color)' }}>5</h3>
+            <h3 style={{ margin: '0.5rem 0', fontSize: '2rem', color: 'var(--accent)' }}>5</h3>
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Top Hiring Regions</p>
             <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
               USA, UK, Canada, Germany, Singapore
@@ -191,7 +191,7 @@ const Dashboard = () => {
             {salaryRanges.map((level, index) => (
               <div key={index} className="card">
                 <h4 style={{ marginBottom: '0.5rem' }}>{level.role}</h4>
-                <p style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--secondary-color)', margin: '0.5rem 0' }}>
+                <p style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--accent)', margin: '0.5rem 0' }}>
                   {level.range}
                 </p>
                 <p style={{ margin: 0, color: 'var(--success-color)', fontSize: '0.875rem' }}>

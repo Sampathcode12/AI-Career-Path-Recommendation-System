@@ -11,6 +11,8 @@ import {
   Legend,
 } from 'chart.js';
 import { StarIcon, GlobeIcon, TrendingUpIcon } from '../components/Icons';
+import { jobsAPI } from '../services/api';
+import { JOB_CATEGORY_FILTER_OPTIONS } from '../constants/jobIndustry';
 import './PageStyles.css';
 
 ChartJS.register(
@@ -43,7 +45,7 @@ const parseGrowthPercent = (growthStr) => parseInt(String(growthStr).replace(/\D
 
 const step = (num, title, desc) => ({ step: num, title, description: desc });
 
-const ALL_JOBS = [
+const ALL_JOBS_MOCK = [
   {
     id: 1,
     rank: 1,
@@ -406,10 +408,6 @@ const ALL_JOBS = [
   },
 ];
 
-const JOB_CATEGORIES = ['All', 'Technology', 'Healthcare', 'Finance', 'Sports', 'Transportation', 'Creative', 'Education', 'Business'];
-
-const TOP_10_JOBS = ALL_JOBS.filter((j) => j.rank <= 10);
-
 const previousYear = new Date().getFullYear() - 1;
 
 const matchSearch = (job, term) => {
@@ -428,6 +426,25 @@ const matchCategory = (job, category) => {
   return job.category === category;
 };
 
+const mapApiJob = (j, rank) => ({
+  id: j.id,
+  rank,
+  title: j.title,
+  sector: j.sector ?? j.category ?? '—',
+  category: j.category ?? '—',
+  salary: j.salaryRange ?? j.salary_range ?? '—',
+  growth: j.growth ?? '—',
+  description: j.description ?? '',
+  regions: '—',
+  skills: j.skills ?? [],
+  qualifications: { education: '—', experience: '—', certifications: '—' },
+  careerPathSteps: (j.careerPath ?? j.career_path ?? []).map((s) => ({
+    step: s.step ?? 0,
+    title: s.title ?? '',
+    description: s.duration ?? '',
+  })),
+});
+
 const Top10Jobs = () => {
   const navigate = useNavigate();
   const [currentDateTime, setCurrentDateTime] = useState(() => formatCurrentDateTime());
@@ -436,11 +453,34 @@ const Top10Jobs = () => {
   const [selectedJobIds, setSelectedJobIds] = useState(new Set());
   const [showSkillsPanel, setShowSkillsPanel] = useState(false);
   const [showComparePanel, setShowComparePanel] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const data = await jobsAPI.getTop(selectedCategory === 'All' ? '' : selectedCategory, 10);
+        const arr = Array.isArray(data) ? data : [];
+        if (!cancelled) setJobs(arr.map((j, i) => mapApiJob(j, i + 1)));
+      } catch (err) {
+        if (!cancelled) setJobs([]);
+        console.error(err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [selectedCategory]);
 
   const filteredJobs = useMemo(
-    () => ALL_JOBS.filter((j) => matchCategory(j, selectedCategory) && matchSearch(j, searchTerm)),
-    [searchTerm, selectedCategory]
+    () => jobs.filter((j) => matchSearch(j, searchTerm)),
+    [jobs, searchTerm]
   );
+
+  const topJobsForChart = useMemo(() => filteredJobs.slice(0, 10), [filteredJobs]);
 
   const toggleJobSelection = (id) => {
     setSelectedJobIds((prev) => {
@@ -451,23 +491,23 @@ const Top10Jobs = () => {
     });
   };
 
-  const selectedJobs = useMemo(() => ALL_JOBS.filter((j) => selectedJobIds.has(j.id)), [selectedJobIds]);
+  const selectedJobs = useMemo(() => jobs.filter((j) => selectedJobIds.has(j.id)), [jobs, selectedJobIds]);
 
   const growthChartData = useMemo(() => ({
-    labels: TOP_10_JOBS.map((j) => (j.title.length > 25 ? j.title.slice(0, 24) + '…' : j.title)),
+    labels: topJobsForChart.map((j) => (j.title.length > 25 ? j.title.slice(0, 24) + '…' : j.title)),
     datasets: [
       {
         label: `Growth % (data through ${previousYear})`,
-        data: TOP_10_JOBS.map((j) => parseGrowthPercent(j.growth)),
-        backgroundColor: TOP_10_JOBS.map((_, i) => {
-          const ratio = i / TOP_10_JOBS.length;
-          return `rgba(59, 130, 246, ${0.5 + ratio * 0.5})`;
+        data: topJobsForChart.map((j) => parseGrowthPercent(j.growth)),
+        backgroundColor: topJobsForChart.map((_, i) => {
+          const ratio = topJobsForChart.length ? i / topJobsForChart.length : 0;
+          return `rgba(13, 115, 119, ${0.5 + ratio * 0.5})`;
         }),
-        borderColor: 'rgba(59, 130, 246, 0.9)',
+        borderColor: 'rgba(13, 115, 119, 0.9)',
         borderWidth: 1,
       },
     ],
-  }), []);
+  }), [topJobsForChart]);
 
   const growthChartOptions = useMemo(() => ({
     indexAxis: 'y',
@@ -506,84 +546,74 @@ const Top10Jobs = () => {
   return (
     <section className="page-section">
       <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-          <GlobeIcon size={28} color="var(--secondary-color)" />
-          <h2 style={{ marginBottom: 0 }}>World&apos;s Top 10 Jobs</h2>
+        <div className="page-section-header">
+          <GlobeIcon size={28} color="var(--accent)" />
+          <h2>World&apos;s Top 10 Jobs</h2>
         </div>
-        <div
-          style={{
-            marginTop: '0.5rem',
-            marginBottom: '1rem',
-            padding: '0.75rem 1rem',
-            background: 'rgba(59, 130, 246, 0.08)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid rgba(59, 130, 246, 0.2)',
-          }}
-        >
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', marginBottom: '0.25rem', fontWeight: '600' }}>
-            Current date & time (updates live)
-          </div>
-          <div style={{ color: 'var(--primary-color)', fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>
+        <div className="datetime-live-box">
+          <div className="datetime-live-box__label">Current date & time (updates live)</div>
+          <div className="datetime-live-box__value">
             {currentDateTime.dateStr} · {currentDateTime.timeStr}
           </div>
         </div>
-        <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
+        <p className="page-lede">
           Ranked by salary potential, global demand, growth rate, and work-life balance. Data reflects major markets worldwide.
         </p>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/jobsearch')}>Search Jobs</button>
-          <button
-            onClick={() => navigate('/recommendation')}
-            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
-          >
+        <div className="job-inline-actions">
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/jobsearch')}>Search Jobs</button>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/recommendation')}>
             Get My Recommendations
           </button>
         </div>
       </div>
 
       <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-          <TrendingUpIcon size={22} color="var(--secondary-color)" />
-          <h3 style={{ margin: 0 }}>Job growth by role</h3>
+        <div className="page-section-header">
+          <TrendingUpIcon size={22} color="var(--accent)" />
+          <h3>Job growth by role</h3>
         </div>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', marginTop: '0.25rem', marginBottom: '1rem' }}>
+        <p className="page-lede">
           Estimated employment growth (%) by job — data through {previousYear}.
         </p>
-        <div style={{ height: '420px', width: '100%', position: 'relative' }}>
-          <Bar data={growthChartData} options={growthChartOptions} />
+        <div className="chart-panel-tall">
+          {loading ? (
+            <p className="jobs-loading">Loading job data...</p>
+          ) : (
+            <Bar data={growthChartData} options={growthChartOptions} />
+          )}
         </div>
       </div>
 
       {/* Search for any job */}
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Find skills & qualifications for a job</h3>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', marginBottom: '1rem' }}>
+        <h3>Find skills & qualifications for a job</h3>
+        <p className="page-lede">
           Choose a job category, then search by title or skill (e.g. &quot;driver&quot;, &quot;cricketer&quot;, &quot;nurse&quot;, &quot;developer&quot;). Results are filtered by the selected category. Select one or more jobs to view skills, qualifications, and career path.
         </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
-          <div className="form-group" style={{ marginBottom: 0, minWidth: '200px' }}>
-            <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', fontSize: '0.9rem' }}>Job category</label>
+        <div className="job-filter-toolbar">
+          <div className="form-group form-group--toolbar form-group--grow">
+            <label htmlFor="top10-category" className="form-label-compact">Job category</label>
             <select
+              id="top10-category"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              style={{ width: '100%', minWidth: '180px' }}
             >
-              {JOB_CATEGORIES.map((cat) => (
+              {JOB_CATEGORY_FILTER_OPTIONS.map((cat) => (
                 <option key={cat} value={cat}>{cat === 'All' ? 'All categories' : cat}</option>
               ))}
             </select>
           </div>
-          <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '220px' }}>
-            <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', fontSize: '0.9rem' }}>Search jobs</label>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div className="form-group form-group--toolbar form-group--grow-wide">
+            <label htmlFor="top10-search" className="form-label-compact">Search jobs</label>
+            <div className="job-search-input-row">
               <input
+                id="top10-search"
                 type="text"
                 placeholder="Job title, sector, or skill..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ flex: 1, minWidth: '180px' }}
               />
-              <button type="button" onClick={() => { setSearchTerm(''); setSelectedCategory('All'); }} style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => { setSearchTerm(''); setSelectedCategory('All'); }}>
                 Clear filters
               </button>
             </div>
@@ -592,33 +622,20 @@ const Top10Jobs = () => {
       </div>
 
       {selectedJobIds.size > 0 && (
-        <div
-          className="card"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '1rem',
-            background: 'rgba(59, 130, 246, 0.06)',
-            border: '1px solid rgba(59, 130, 246, 0.25)',
-          }}
-        >
-          <span style={{ fontWeight: '600', color: 'var(--primary-color)' }}>
+        <div className="card selection-banner">
+          <span className="selection-banner__text">
             {selectedJobIds.size} job(s) selected — view details or compare main benefits
           </span>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button onClick={() => { setShowSkillsPanel(true); setShowComparePanel(false); }}>View skills & career path</button>
+          <div className="selection-banner__actions">
+            <button type="button" className="btn btn-primary" onClick={() => { setShowSkillsPanel(true); setShowComparePanel(false); }}>View skills & career path</button>
             <button
+              type="button"
+              className="btn btn-cyan"
               onClick={() => { setShowComparePanel(true); setShowSkillsPanel(false); }}
-              style={{ background: 'rgba(6, 182, 212, 0.9)', color: 'white' }}
             >
               Compare benefits
             </button>
-            <button
-              onClick={() => setSelectedJobIds(new Set())}
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
-            >
+            <button type="button" className="btn btn-secondary" onClick={() => setSelectedJobIds(new Set())}>
               Clear selection
             </button>
           </div>
@@ -626,80 +643,75 @@ const Top10Jobs = () => {
       )}
 
       {showComparePanel && selectedJobs.length > 0 && (
-        <div className="card" style={{ marginTop: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0 }}>Compare main benefits</h3>
-            <button
-              onClick={() => setShowComparePanel(false)}
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
-            >
+        <div className="card card--stack-gap">
+          <div className="panel-header-row">
+            <h3>Compare main benefits</h3>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowComparePanel(false)}>
               Close
             </button>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', marginBottom: '1.25rem' }}>
+          <p className="page-lede">
             Side-by-side comparison of key benefits for your selected jobs. Use this to decide which role fits you best.
           </p>
-          <div style={{ overflowX: 'auto', width: '100%' }}>
-            <table style={{ width: '100%', minWidth: '500px', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+          <div className="compare-table-wrap">
+            <table className="compare-table">
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                  <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', color: 'var(--primary-color)', width: '140px', verticalAlign: 'top' }}>Benefit</th>
+                <tr>
+                  <th className="compare-table__label">Benefit</th>
                   {selectedJobs.map((job) => (
-                    <th key={job.id} style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', color: 'var(--secondary-color)', minWidth: '180px', verticalAlign: 'top' }}>
-                      {job.title}
-                    </th>
+                    <th key={job.id} className="compare-table__job">{job.title}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Salary (global)</td>
+                <tr>
+                  <td className="compare-table__label">Salary (global)</td>
                   {selectedJobs.map((job) => (
-                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{job.salary}</td>
+                    <td key={job.id}>{job.salary}</td>
                   ))}
                 </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Growth</td>
+                <tr>
+                  <td className="compare-table__label">Growth</td>
                   {selectedJobs.map((job) => (
-                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{job.growth}</td>
+                    <td key={job.id}>{job.growth}</td>
                   ))}
                 </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Sector / Category</td>
+                <tr>
+                  <td className="compare-table__label">Sector / Category</td>
                   {selectedJobs.map((job) => (
-                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{job.sector} · {job.category || '—'}</td>
+                    <td key={job.id}>{job.sector} · {job.category || '—'}</td>
                   ))}
                 </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Key skills</td>
+                <tr>
+                  <td className="compare-table__label">Key skills</td>
                   {selectedJobs.map((job) => (
-                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    <td key={job.id} className="compare-table__compact">
                       {job.skills.slice(0, 4).join('; ')}{job.skills.length > 4 ? ' …' : ''}
                     </td>
                   ))}
                 </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Education</td>
+                <tr>
+                  <td className="compare-table__label">Education</td>
                   {selectedJobs.map((job) => (
-                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{job.qualifications.education}</td>
+                    <td key={job.id} className="compare-table__compact">{job.qualifications.education}</td>
                   ))}
                 </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Experience</td>
+                <tr>
+                  <td className="compare-table__label">Experience</td>
                   {selectedJobs.map((job) => (
-                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{job.qualifications.experience}</td>
+                    <td key={job.id} className="compare-table__compact">{job.qualifications.experience}</td>
                   ))}
                 </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Certifications</td>
+                <tr>
+                  <td className="compare-table__label">Certifications</td>
                   {selectedJobs.map((job) => (
-                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{job.qualifications.certifications}</td>
+                    <td key={job.id} className="compare-table__compact">{job.qualifications.certifications}</td>
                   ))}
                 </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: '600', color: 'var(--text-primary)' }}>Top regions</td>
+                <tr>
+                  <td className="compare-table__label">Top regions</td>
                   {selectedJobs.map((job) => (
-                    <td key={job.id} style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{job.regions}</td>
+                    <td key={job.id} className="compare-table__compact">{job.regions}</td>
                   ))}
                 </tr>
               </tbody>
@@ -709,42 +721,31 @@ const Top10Jobs = () => {
       )}
 
       {showSkillsPanel && selectedJobs.length > 0 && (
-        <div className="card" style={{ marginTop: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0 }}>Skills, qualifications & career path for selected jobs</h3>
-            <button
-              onClick={() => setShowSkillsPanel(false)}
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
-            >
+        <div className="card card--stack-gap">
+          <div className="panel-header-row">
+            <h3>Skills, qualifications & career path for selected jobs</h3>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowSkillsPanel(false)}>
               Close
             </button>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', marginBottom: '1.25rem' }}>
+          <p className="page-lede">
             For each role: required skills, qualifications, and a step-by-step career path from basic to target position.
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="panel-body-stack">
             {selectedJobs.map((job) => (
-              <div
-                key={job.id}
-                style={{
-                  padding: '1.25rem',
-                  background: 'var(--bg-primary)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-color)',
-                }}
-              >
-                <h4 style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--secondary-color)' }}>{job.title}</h4>
-                <div style={{ marginBottom: '1rem' }}>
-                  <strong style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Skills</strong>
-                  <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.7 }}>
+              <div key={job.id} className="job-detail-block">
+                <h4>{job.title}</h4>
+                <div>
+                  <strong className="block-title">Skills</strong>
+                  <ul>
                     {job.skills.map((skill, i) => (
                       <li key={i}>{skill}</li>
                     ))}
                   </ul>
                 </div>
-                <div style={{ marginBottom: '1rem' }}>
-                  <strong style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Qualifications</strong>
-                  <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.7 }}>
+                <div>
+                  <strong className="block-title">Qualifications</strong>
+                  <ul>
                     <li><strong>Education:</strong> {job.qualifications.education}</li>
                     <li><strong>Experience:</strong> {job.qualifications.experience}</li>
                     <li><strong>Certifications:</strong> {job.qualifications.certifications}</li>
@@ -752,10 +753,10 @@ const Top10Jobs = () => {
                 </div>
                 {job.careerPathSteps && job.careerPathSteps.length > 0 && (
                   <div>
-                    <strong style={{ display: 'block', marginBottom: '0.75rem', fontSize: '0.9rem' }}>Career path (step by step from basic)</strong>
-                    <ol style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.8 }}>
+                    <strong className="block-title">Career path (step by step from basic)</strong>
+                    <ol>
                       {job.careerPathSteps.map((s) => (
-                        <li key={s.step} style={{ marginBottom: '0.5rem' }}>
+                        <li key={s.step}>
                           <strong>Step {s.step}: {s.title}</strong> — {s.description}
                         </li>
                       ))}
@@ -769,49 +770,47 @@ const Top10Jobs = () => {
       )}
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>
+        <h3>
           {selectedCategory !== 'All' || searchTerm.trim()
             ? `Jobs: ${selectedCategory !== 'All' ? selectedCategory : 'All'}${searchTerm.trim() ? ` · "${searchTerm.trim()}"` : ''} (${filteredJobs.length})`
             : `All jobs (${filteredJobs.length}) — choose category or search to filter`}
         </h3>
         {filteredJobs.length === 0 ? (
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 0 }}>
+          <p className="jobs-muted">
             No jobs match the selected category and search. Try &quot;All categories&quot; or different keywords (e.g. driver, cricketer, nurse, developer, teacher).
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+          <div className="jobs-stack jobs-stack--tight-top">
             {filteredJobs.map((job) => (
-              <div key={job.id} className="job-card" style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: selectedJobIds.has(job.id) ? 'rgba(59, 130, 246, 0.06)' : 'var(--bg-primary)' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', flexShrink: 0 }} title="Select to view skills & career path">
+              <div
+                key={job.id}
+                className={`card job-card job-card--selectable${selectedJobIds.has(job.id) ? ' job-card--selected' : ''}`}
+              >
+                <div className="job-select-row">
+                  <label className="job-select-row__check" title="Select to view skills & career path">
                     <input
                       type="checkbox"
                       checked={selectedJobIds.has(job.id)}
                       onChange={() => toggleJobSelection(job.id)}
-                      style={{ width: '18px', height: '18px', accentColor: 'var(--secondary-color)' }}
                     />
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '500' }}>Select</span>
+                    <span>Select</span>
                   </label>
-                  <div style={{ flex: 1, minWidth: '200px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
-                      <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{job.title}</h4>
-                      <span style={{ padding: '0.2rem 0.5rem', backgroundColor: 'rgba(59, 130, 246, 0.12)', color: 'var(--secondary-color)', borderRadius: '16px', fontSize: '0.75rem', fontWeight: '600' }}>
-                        {job.sector}
-                      </span>
+                  <div className="job-select-row__main">
+                    <div className="job-select-row__title-line">
+                      <h4>{job.title}</h4>
+                      <span className="job-pill">{job.sector}</span>
                       {job.category && (
-                        <span style={{ padding: '0.2rem 0.5rem', backgroundColor: 'rgba(6, 182, 212, 0.15)', color: 'var(--accent-color)', borderRadius: '16px', fontSize: '0.75rem', fontWeight: '600' }}>
-                          {job.category}
-                        </span>
+                        <span className="job-pill job-pill--category">{job.category}</span>
                       )}
                     </div>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.9rem', lineHeight: 1.5 }}>{job.description}</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.85rem' }}>
+                    <p className="job-select-row__desc">{job.description}</p>
+                    <div className="job-select-row__meta">
                       <span><strong>Salary:</strong> {job.salary}</span>
                       <span><strong>Growth:</strong> {job.growth}</span>
-                      <span style={{ color: 'var(--text-light)' }}>{job.regions}</span>
+                      <span className="job-select-row__regions">{job.regions}</span>
                     </div>
                   </div>
-                  <StarIcon size={20} color="var(--accent-color)" style={{ flexShrink: 0 }} />
+                  <StarIcon size={20} color="var(--accent)" className="job-select-row__star" />
                 </div>
               </div>
             ))}
@@ -819,9 +818,9 @@ const Top10Jobs = () => {
         )}
       </div>
 
-      <div className="card" style={{ marginTop: '1.5rem' }}>
+      <div className="card card--stack-gap card--section-spaced">
         <h4>About this list</h4>
-        <p style={{ marginBottom: 0 }}>
+        <p className="jobs-muted">
           Rankings are based on commonly cited global indices (salary, demand, growth, work-life balance) and may vary by source and year. Use this as a starting point and explore roles that match your skills via Assessment and Recommendations.
         </p>
       </div>

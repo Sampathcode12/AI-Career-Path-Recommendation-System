@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './AuthStyles.css';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const from = location.state?.from?.pathname || '/home';
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -37,8 +39,8 @@ const Login = () => {
       // Call backend API
       await login(formData.email, formData.password);
       
-      // Success - redirect to home
-      navigate('/home');
+      // Success - redirect to intended page or home
+      navigate(from, { replace: true });
     } catch (err) {
       // Handle error
       setError(err.message || 'Login failed. Please check your email and password.');

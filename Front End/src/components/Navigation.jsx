@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { HomeIcon, UserIcon, FileIcon, TargetIcon, TrendingUpIcon, SearchIcon, StarIcon, LogoutIcon } from './Icons';
+import { HomeIcon, UserIcon, FileIcon, TargetIcon, TrendingUpIcon, SearchIcon, StarIcon, ChartIcon, LogoutIcon } from './Icons';
 import './Navigation.css';
 
 const Navigation = () => {
@@ -47,6 +47,10 @@ const Navigation = () => {
       <Link to="/top-jobs" className={isActive('/top-jobs')}>
         <StarIcon size={18} color="currentColor" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
         Top 10 Jobs
+      </Link>
+      <Link to="/skill-gap" className={isActive('/skill-gap')}>
+        <ChartIcon size={18} color="currentColor" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+        Skill Gap
       </Link>
       <div className="nav-user-section">
         {user && (
