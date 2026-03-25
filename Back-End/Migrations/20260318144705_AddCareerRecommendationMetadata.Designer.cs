@@ -4,6 +4,7 @@ using BackEnd.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BackEnd.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260318144705_AddCareerRecommendationMetadata")]
+    partial class AddCareerRecommendationMetadata
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -87,105 +90,6 @@ namespace BackEnd.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("CareerRecommendations");
-                });
-
-            modelBuilder.Entity("BackEnd.Models.IndustrySkillGap", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("DemandGrowth")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("GapSkillsJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("IndustryId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SupplyLevel")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TopDemandSkillsJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TopRegionsJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TypicalCertifications")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TypicalEducation")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TypicalSalaryRange")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("IndustrySkillGaps");
-                });
-
-            modelBuilder.Entity("BackEnd.Models.JobListing", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CareerPathJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Category")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Company")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Growth")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Location")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SalaryRange")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Sector")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SkillsJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Url")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("JobListings");
                 });
 
             modelBuilder.Entity("BackEnd.Models.MarketTrend", b =>
@@ -297,37 +201,19 @@ namespace BackEnd.Migrations
                     b.Property<string>("Bio")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("CertificateCourseTitles")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Education")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ExperienceLevel")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("FirstJobTitle")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Gender")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool?>("HasAdditionalCertifications")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Interests")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool?>("IsWorking")
-                        .HasColumnType("bit");
 
                     b.Property<string>("LinkedInUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Location")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("MastersField")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PortfolioUrl")
@@ -337,15 +223,6 @@ namespace BackEnd.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Skills")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("UgCgpaOrPercentage")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("UgCourse")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("UgSpecialization")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")

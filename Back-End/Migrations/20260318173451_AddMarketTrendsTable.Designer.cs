@@ -4,6 +4,7 @@ using BackEnd.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BackEnd.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260318173451_AddMarketTrendsTable")]
+    partial class AddMarketTrendsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -297,37 +300,19 @@ namespace BackEnd.Migrations
                     b.Property<string>("Bio")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("CertificateCourseTitles")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Education")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ExperienceLevel")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("FirstJobTitle")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Gender")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool?>("HasAdditionalCertifications")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Interests")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool?>("IsWorking")
-                        .HasColumnType("bit");
 
                     b.Property<string>("LinkedInUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Location")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("MastersField")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PortfolioUrl")
@@ -337,15 +322,6 @@ namespace BackEnd.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Skills")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("UgCgpaOrPercentage")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("UgCourse")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("UgSpecialization")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
