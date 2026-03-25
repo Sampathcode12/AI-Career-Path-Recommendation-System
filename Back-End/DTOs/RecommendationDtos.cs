@@ -8,4 +8,11 @@ public record RecommendationResponse(
     string? Category,
     bool Saved,
     int SortOrder,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    int? MatchPercentage = null,
+    string? SalaryRange = null,
+    string? Growth = null,
+    IReadOnlyList<string>? Skills = null,
+    IReadOnlyList<LearningPathStepDto>? LearningPath = null);
+
+public record LearningPathStepDto(int Step, string Title, string Duration);

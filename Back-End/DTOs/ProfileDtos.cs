@@ -3,6 +3,7 @@ namespace BackEnd.DTOs;
 public record ProfileResponse(
     int Id,
     int UserId,
+    string? DisplayName,
     string? Skills,
     string? Interests,
     string? ExperienceLevel,
@@ -12,6 +13,15 @@ public record ProfileResponse(
     string? Bio,
     string? LinkedInUrl,
     string? PortfolioUrl,
+    string? Gender,
+    string? UgCourse,
+    string? UgSpecialization,
+    string? UgCgpaOrPercentage,
+    bool? HasAdditionalCertifications,
+    string? CertificateCourseTitles,
+    bool? IsWorking,
+    string? FirstJobTitle,
+    string? MastersField,
     DateTime? UpdatedAt);
 
 public record ProfileCreateOrUpdateRequest(
@@ -23,4 +33,14 @@ public record ProfileCreateOrUpdateRequest(
     string? Location,
     string? Bio,
     string? LinkedInUrl,
-    string? PortfolioUrl);
+    string? PortfolioUrl,
+    string? DisplayName,
+    string? Gender,
+    string? UgCourse,
+    string? UgSpecialization,
+    string? UgCgpaOrPercentage,
+    bool? HasAdditionalCertifications,
+    string? CertificateCourseTitles,
+    bool? IsWorking,
+    string? FirstJobTitle,
+    string? MastersField);

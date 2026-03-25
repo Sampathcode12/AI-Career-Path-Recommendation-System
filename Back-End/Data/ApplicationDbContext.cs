@@ -15,6 +15,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<CareerRecommendation> CareerRecommendations => Set<CareerRecommendation>();
     public DbSet<SavedJob> SavedJobs => Set<SavedJob>();
     public DbSet<MarketTrend> MarketTrends => Set<MarketTrend>();
+    public DbSet<IndustrySkillGap> IndustrySkillGaps => Set<IndustrySkillGap>();
+    public DbSet<JobListing> JobListings => Set<JobListing>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
