@@ -52,9 +52,11 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
+builder.Services.AddHttpClient<IOpenAIService, OpenAIService>();
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<IMarketTrendsService, MarketTrendsService>();
+builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 
 // CORS
 builder.Services.AddCors(options =>
@@ -74,11 +76,12 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Apply pending migrations on startup (updates DB to match code)
+// Apply pending migrations and seed data
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
+    await DataSeeder.SeedAsync(db);
 }
 
 app.Run();

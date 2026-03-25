@@ -13,12 +13,18 @@ public class ProfileService : IProfileService
 
     public async Task<ProfileResponse?> GetByUserIdAsync(int userId, CancellationToken ct = default)
     {
-        var p = await _db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == userId, ct);
+        var p = await _db.UserProfiles.AsNoTracking()
+            .Include(x => x.User)
+            .FirstOrDefaultAsync(x => x.UserId == userId, ct);
         return p == null ? null : ToResponse(p);
     }
 
     public async Task<ProfileResponse> CreateAsync(int userId, ProfileCreateOrUpdateRequest request, CancellationToken ct = default)
     {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (!string.IsNullOrWhiteSpace(request.DisplayName) && user != null)
+            user.Name = request.DisplayName.Trim();
+
         var profile = new UserProfile
         {
             UserId = userId,
@@ -31,17 +37,32 @@ public class ProfileService : IProfileService
             Bio = request.Bio,
             LinkedInUrl = request.LinkedInUrl,
             PortfolioUrl = request.PortfolioUrl,
+            Gender = request.Gender,
+            UgCourse = request.UgCourse,
+            UgSpecialization = request.UgSpecialization,
+            UgCgpaOrPercentage = request.UgCgpaOrPercentage,
+            HasAdditionalCertifications = request.HasAdditionalCertifications,
+            CertificateCourseTitles = request.CertificateCourseTitles,
+            IsWorking = request.IsWorking,
+            FirstJobTitle = request.FirstJobTitle,
+            MastersField = request.MastersField,
             UpdatedAt = DateTime.UtcNow
         };
         _db.UserProfiles.Add(profile);
         await _db.SaveChangesAsync(ct);
-        return ToResponse(profile);
+        var reloaded = await _db.UserProfiles.AsNoTracking()
+            .Include(x => x.User)
+            .FirstAsync(x => x.Id == profile.Id, ct);
+        return ToResponse(reloaded);
     }
 
     public async Task<ProfileResponse?> UpdateAsync(int userId, ProfileCreateOrUpdateRequest request, CancellationToken ct = default)
     {
-        var profile = await _db.UserProfiles.FirstOrDefaultAsync(x => x.UserId == userId, ct);
+        var profile = await _db.UserProfiles.Include(x => x.User).FirstOrDefaultAsync(x => x.UserId == userId, ct);
         if (profile == null) return null;
+
+        if (!string.IsNullOrWhiteSpace(request.DisplayName) && profile.User != null)
+            profile.User.Name = request.DisplayName.Trim();
 
         profile.Skills = request.Skills ?? profile.Skills;
         profile.Interests = request.Interests ?? profile.Interests;
@@ -52,11 +73,42 @@ public class ProfileService : IProfileService
         profile.Bio = request.Bio ?? profile.Bio;
         profile.LinkedInUrl = request.LinkedInUrl ?? profile.LinkedInUrl;
         profile.PortfolioUrl = request.PortfolioUrl ?? profile.PortfolioUrl;
+        profile.Gender = request.Gender ?? profile.Gender;
+        profile.UgCourse = request.UgCourse ?? profile.UgCourse;
+        profile.UgSpecialization = request.UgSpecialization ?? profile.UgSpecialization;
+        profile.UgCgpaOrPercentage = request.UgCgpaOrPercentage ?? profile.UgCgpaOrPercentage;
+        if (request.HasAdditionalCertifications.HasValue) profile.HasAdditionalCertifications = request.HasAdditionalCertifications;
+        profile.CertificateCourseTitles = request.CertificateCourseTitles ?? profile.CertificateCourseTitles;
+        if (request.IsWorking.HasValue) profile.IsWorking = request.IsWorking;
+        profile.FirstJobTitle = request.FirstJobTitle ?? profile.FirstJobTitle;
+        profile.MastersField = request.MastersField ?? profile.MastersField;
         profile.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
         return ToResponse(profile);
     }
 
     private static ProfileResponse ToResponse(UserProfile p) =>
-        new(p.Id, p.UserId, p.Skills, p.Interests, p.ExperienceLevel, p.Education, p.PreferredIndustries, p.Location, p.Bio, p.LinkedInUrl, p.PortfolioUrl, p.UpdatedAt);
+        new(
+            p.Id,
+            p.UserId,
+            p.User?.Name,
+            p.Skills,
+            p.Interests,
+            p.ExperienceLevel,
+            p.Education,
+            p.PreferredIndustries,
+            p.Location,
+            p.Bio,
+            p.LinkedInUrl,
+            p.PortfolioUrl,
+            p.Gender,
+            p.UgCourse,
+            p.UgSpecialization,
+            p.UgCgpaOrPercentage,
+            p.HasAdditionalCertifications,
+            p.CertificateCourseTitles,
+            p.IsWorking,
+            p.FirstJobTitle,
+            p.MastersField,
+            p.UpdatedAt);
 }

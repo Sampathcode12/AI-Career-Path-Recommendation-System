@@ -10,6 +10,8 @@ public class CareerRecommendation
     public bool Saved { get; set; }
     public int SortOrder { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>JSON: matchPercentage, salaryRange, skills[], learningPath[], etc. from AI.</summary>
+    public string? MetadataJson { get; set; }
 
     public virtual User User { get; set; } = null!;
 }
