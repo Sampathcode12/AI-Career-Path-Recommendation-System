@@ -23,6 +23,13 @@ public class JobsController : ControllerBase
         return Ok(list);
     }
 
+    [HttpGet("top")]
+    public async Task<IActionResult> GetTop([FromQuery] string? category, [FromQuery] int limit = 10, CancellationToken ct = default)
+    {
+        var list = await _jobService.GetTopJobsAsync(category, limit, ct);
+        return Ok(list);
+    }
+
     [HttpGet("saved")]
     public async Task<IActionResult> GetSaved(CancellationToken ct)
     {
