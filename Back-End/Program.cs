@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using BackEnd.Data;
 using BackEnd.Services;
@@ -13,7 +14,10 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(o =>
+{
+    o.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+});
 
 // DbContext: connection string "Default" (or "DefaultConnection"). On run, DB is created/updated via migrations.
 var connectionString = builder.Configuration.GetConnectionString("Default")
@@ -80,8 +84,9 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
     await db.Database.MigrateAsync();
-    await DataSeeder.SeedAsync(db);
+    await DataSeeder.SeedAsync(db, env);
 }
 
 app.Run();

@@ -24,6 +24,8 @@ public class OpenAIService : IOpenAIService
     private readonly string _model;
     private readonly string _provider;
 
+    public bool IsLlmAvailable => _llmAvailable;
+
     public OpenAIService(HttpClient http, IConfiguration config)
     {
         _http = http;
@@ -49,7 +51,21 @@ public class OpenAIService : IOpenAIService
                 _        => "gpt-4o-mini"
             };
 
-        var apiKey = config[$"{section}:ApiKey"] ?? "";
+        var apiKey = (config[$"{section}:ApiKey"] ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            apiKey = _provider switch
+            {
+                var p when p.Equals("Gemini", StringComparison.OrdinalIgnoreCase)
+                    => Environment.GetEnvironmentVariable("GEMINI_API_KEY")?.Trim() ?? "",
+                var p when p.Equals("Groq", StringComparison.OrdinalIgnoreCase)
+                    => Environment.GetEnvironmentVariable("GROQ_API_KEY")?.Trim() ?? "",
+                var p when p.Equals("OpenAI", StringComparison.OrdinalIgnoreCase)
+                    => Environment.GetEnvironmentVariable("OPENAI_API_KEY")?.Trim() ?? "",
+                _ => ""
+            };
+        }
+
         _isLocal = _provider.Equals("Local", StringComparison.OrdinalIgnoreCase);
         _llmAvailable = _isLocal || !string.IsNullOrWhiteSpace(apiKey);
 
@@ -63,7 +79,7 @@ public class OpenAIService : IOpenAIService
     {
         if (!_llmAvailable) return null;
 
-        var prompt = $@"You are a career advisor. Given the following structured student/graduate profile and optional assessment, suggest 5-7 careers that fit well.
+        var prompt = $@"You are a career advisor. Given the profile and assessment below, suggest 5-7 careers that specifically fit THIS person — use their education, skills, interests, location, and assessment answers. Do not output a generic unrelated list; tie each role to evidence from the profile/assessment in the description.
 
 Profile:
 {profileSummary}
@@ -71,7 +87,7 @@ Profile:
 Assessment:
 {assessmentSummary}
 
-Respond with a JSON array of objects. Each object must have: title, description, category, matchPercentage (1-100), salaryRange (e.g. ""$80k - $120k""), growth (e.g. ""+15%""), skills (array of strings), learningPath (array of objects with step, title, duration).
+Respond with a JSON array of objects. Each object must have: title, description, category, matchPercentage (1-100), salaryRange (e.g. ""$80k - $120k"" or a realistic range for their region if inferable), growth (e.g. ""+15%""), skills (array of strings), learningPath (array of objects with step, title, duration).
 Example: [{{""title"":""Data Scientist"",""description"":""..."",""category"":""Technology"",""matchPercentage"":87,""salaryRange"":""$95k - $140k"",""growth"":""+18%"",""skills"":[""Python"",""ML""],""learningPath"":[{{""step"":1,""title"":""Learn Python"",""duration"":""2-3 months""}}]}}]
 Return only valid JSON, no markdown or extra text.";
 
@@ -106,7 +122,12 @@ Return only valid JSON, no markdown or extra text.";
         {
             var messages = new List<object>
             {
-                new { role = "system", content = $@"You are a helpful career advisor. The user has received these career recommendations. Answer their follow-up questions about these careers, learning paths, skills, salary, or related topics. Be concise and helpful.
+                new { role = "system", content = $@"You are a helpful career advisor (like ChatGPT for careers). The user has career recommendations below.
+
+Rules:
+- This is a multi-turn conversation: you see prior user and assistant messages in the thread. Use that context—answer follow-ups, clarifications, and ""what about..."" questions naturally.
+- Stay grounded in the recommended careers when relevant; you may add general career advice if helpful.
+- Be clear and concise; use short paragraphs or bullets when listing steps or skills.
 
 Recommended careers:
 {recommendationsContext}" }
@@ -129,7 +150,7 @@ Recommended careers:
     }
 
     private object BuildRequestBody(object messages) =>
-        new { model = _model, messages, temperature = 0.7 };
+        new { model = _model, messages, temperature = 0.7, max_tokens = 2048 };
 
     #region JSON helpers
 

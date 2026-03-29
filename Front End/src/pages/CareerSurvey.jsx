@@ -166,6 +166,10 @@ const CareerSurvey = () => {
                 Save &amp; view recommendations
               </button>
             </div>
+            <p className="jobs-muted" style={{ fontSize: '0.875rem', marginTop: '0.75rem', maxWidth: '42rem' }}>
+              For careers tailored to this survey (not the generic template list), configure a free{' '}
+              <strong>Gemini</strong> API key on the backend — see <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>.
+            </p>
           </>
         )}
       </div>

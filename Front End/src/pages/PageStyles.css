@@ -827,6 +827,115 @@ strong {
   white-space: nowrap;
 }
 
+.career-intake-form--panel {
+  margin-bottom: 1.75rem;
+  padding: 1.25rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
+.home-career-intake {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-light);
+}
+
+.career-intake-form--panel {
+  margin-bottom: 1.75rem;
+  padding: 1.25rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
+.home-career-intake-panel {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-light);
+}
+
+/* Searchable UG course combobox */
+.searchable-intake-select__wrap {
+  position: relative;
+}
+
+.searchable-intake-select__list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin: 4px 0 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  max-height: min(22rem, 55vh);
+  overflow-y: auto;
+  z-index: 50;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+
+.searchable-intake-select__list li {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.searchable-intake-select__list li:hover,
+.searchable-intake-select__list li.is-highlighted {
+  background: rgba(13, 115, 119, 0.1);
+}
+
+.searchable-intake-select__empty {
+  cursor: default;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.searchable-intake-select__other {
+  border-top: 1px solid var(--border-light);
+  margin-top: 0.125rem;
+  padding-top: 0.5rem;
+  font-weight: 500;
+}
+
+.career-intake-interests-block .career-intake-interests-lede {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.career-intake-suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+button.career-intake-chip {
+  margin: 0;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: var(--bg-page);
+  color: var(--accent);
+  border: 1px solid rgba(13, 115, 119, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color var(--transition), border-color var(--transition);
+}
+
+button.career-intake-chip:hover {
+  background: rgba(13, 115, 119, 0.08);
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
 .review-section {
   background: var(--bg-page);
   padding: var(--space-md);

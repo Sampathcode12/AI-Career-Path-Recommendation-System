@@ -33,9 +33,7 @@ internal static class CareerChatFallback
                 LearningPath: null));
         }
 
-        var body = BuildReply(userMessage, fake);
-        return body + Environment.NewLine + Environment.NewLine
-            + "(Note: The database was not reachable, so this used built-in sample careers. Set ConnectionStrings:Default to a working SQL Server or LocalDB in appsettings, then restart the API.)";
+        return BuildReply(userMessage, fake);
     }
 
     public static string BuildReply(string userMessage, IReadOnlyList<RecommendationResponse> recs)
@@ -44,36 +42,142 @@ internal static class CareerChatFallback
         if (recs.Count == 0)
             return "You do not have career recommendations saved yet. Generate recommendations from this page (or complete your career survey), then you can ask about salaries, skills, learning paths, or how roles compare.";
 
-        var lower = msg.ToLowerInvariant();
+        // Route intents using the *current* user line only. Augmented history contains past replies with words like "salary" and would break follow-ups (e.g. "hi" matching salary).
+        var route = ExtractCurrentUserMessage(msg);
+        var routeLower = route.ToLowerInvariant();
 
-        if (IsGreeting(lower))
+        if (IsGreeting(routeLower))
             return BuildGreeting(recs);
 
-        if (ContainsAny(lower, "salary", "pay", "wage", "money", "earn", "income"))
+        if (IsCountrySalaryQuestion(routeLower))
+            return BuildCountrySalaryGuidance(recs);
+
+        if (ContainsAny(routeLower, "salary", "sallry", "salery", "pay", "wage", "money", "earn", "income", "compensation"))
             return BuildSalarySummary(recs);
 
-        if (ContainsAny(lower, "skill", "skills", "learn", "need to know", "requirement"))
+        if (ContainsAny(routeLower, "skill", "skills", "learn", "need to know", "requirement"))
             return BuildSkillsSummary(recs);
 
-        if (ContainsAny(lower, "path", "course", "how to start", "steps", "roadmap", "timeline"))
+        if (ContainsAny(routeLower, "path", "course", "how to start", "steps", "roadmap", "timeline"))
             return BuildLearningPathSummary(recs);
 
-        if (ContainsAny(lower, "compare", "difference", "better", "best", "which one", "vs ", "versus"))
+        if (ContainsAny(routeLower, "compare", "difference", "better", "best", "which one", "vs ", "versus", "top 2", "two recommendation"))
             return BuildCompareSummary(recs);
 
-        if (ContainsAny(lower, "saved", "bookmark", "favorite"))
+        if (ContainsAny(routeLower, "saved", "bookmark", "favorite"))
             return "You can save careers you like with the bookmark control on each card. Saved items stay on your list when you come back.";
 
-        var about = FindCareerMention(msg, recs);
+        if (IsWebSearchRequest(routeLower))
+            return BuildWebSearchGuidance(recs);
+
+        var userOnlyContext = ConcatenateUserLinesFromAugmented(msg);
+        var disambiguation = string.IsNullOrWhiteSpace(userOnlyContext) ? route : $"{userOnlyContext} {route}";
+
+        var about = FindCareerMention(route, recs)
+            ?? (IsVagueFollowUp(routeLower) ? FindCareerMention(disambiguation, recs) : null);
         if (about != null)
             return BuildSingleCareerParagraph(about);
 
-        return BuildDefaultSummary(recs, msg);
+        return BuildDefaultSummary(recs);
     }
 
-    private static bool IsGreeting(string lower) =>
-        lower is "hi" or "hello" or "hey" or "good morning" or "good afternoon" or "good evening"
-        || lower.StartsWith("hi ") || lower.StartsWith("hello ") || lower.StartsWith("hey ");
+    private static bool IsWebSearchRequest(string lower) =>
+        ContainsAny(lower, "google", "search the web", "look up online", "check online", "can you search", "browse the", "internet for")
+        || (lower.Contains("check", StringComparison.Ordinal) && ContainsAny(lower, "google", "online", "internet"));
+
+    private static string BuildWebSearchGuidance(IReadOnlyList<RecommendationResponse> recs)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("I can’t open Google or browse the web from this chat. Use your browser instead:");
+        sb.AppendLine("- Search: [job title] + [city or country] + salary or careers (e.g. “Data Scientist salary Germany 2025”).");
+        sb.AppendLine("- Try Glassdoor, Indeed, Levels.fyi, LinkedIn, or official labour statistics for your country.");
+        sb.AppendLine();
+        sb.AppendLine("Roles from your list to look up:");
+        foreach (var r in recs.Take(8))
+            sb.AppendLine($"- {r.Title}");
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>Only past user lines — never assistant text (which lists all careers and causes wrong matches).</summary>
+    private static string ConcatenateUserLinesFromAugmented(string fullMessage)
+    {
+        const string prefix = "Earlier in this chat:\n";
+        const string marker = "\n\nCurrent message: ";
+        var p = fullMessage.IndexOf(prefix, StringComparison.Ordinal);
+        if (p < 0) return "";
+
+        var start = p + prefix.Length;
+        var end = fullMessage.IndexOf(marker, start, StringComparison.Ordinal);
+        var block = end >= 0 ? fullMessage[start..end] : fullMessage[start..];
+
+        var sb = new StringBuilder();
+        foreach (var raw in block.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = raw.Trim();
+            if (line.Length < 6) continue;
+            if (!line.StartsWith("user:", StringComparison.OrdinalIgnoreCase)) continue;
+            var content = line[5..].Trim();
+            if (content.Length > 0) sb.Append(content).Append(' ');
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    private static bool IsVagueFollowUp(string lower)
+    {
+        var t = lower.TrimEnd('.', '!', '?', '…').Trim();
+        if (t.Length > 72) return false;
+        return ContainsAny(t, "tell me more", "tel me more", "say more", "more detail", "more details", "more about it", "go on", "continue", "what else", "expand on that", "elaborate", "anything else")
+            || t is "more" or "yes" or "ok" or "okay" or "sure" or "yep" or "yeah";
+    }
+
+    /// <summary>Uses only the latest user message for keyword routing when history was prepended (multi-turn fallback).</summary>
+    private static string ExtractCurrentUserMessage(string fullMessage)
+    {
+        const string marker = "\n\nCurrent message: ";
+        var i = fullMessage.LastIndexOf(marker, StringComparison.Ordinal);
+        if (i >= 0)
+        {
+            var tail = fullMessage[(i + marker.Length)..].Trim();
+            if (tail.Length > 0) return tail;
+        }
+
+        return fullMessage.Trim();
+    }
+
+    private static bool IsCountrySalaryQuestion(string lower) =>
+        ContainsAny(lower, "country", "countries", "country-wise", "country wise", "by country", "per country", "each country")
+        || (lower.Contains("region", StringComparison.Ordinal) && ContainsAny(lower, "salary", "pay", "wage", "compensation"))
+        || ContainsAny(lower, "worldwide", "international", "globally", "geo", "location-based", "location based");
+
+    private static string BuildCountrySalaryGuidance(IReadOnlyList<RecommendationResponse> recs)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("We don’t store country-by-country salary tables in your profile here. Use this as a guide, then verify on local job boards:");
+        sb.AppendLine();
+        sb.AppendLine("How to compare by country");
+        sb.AppendLine("- United States — Often highest nominal tech pay; strong variation by city (SF/NYC vs smaller metros). Try Levels.fyi, Glassdoor, BLS.");
+        sb.AppendLine("- United Kingdom / EU — Gross figures differ from US; check Indeed, Reed, Eurostat-style sources, or country unions.");
+        sb.AppendLine("- Canada / Australia — Mid-high vs global; use Glassdoor.ca, Seek, government labour surveys.");
+        sb.AppendLine("- India / Southeast Asia / LATAM — Big spread between local employers vs multinationals; use Naukri, Glassdoor regional, LinkedIn salary insights.");
+        sb.AppendLine();
+        sb.AppendLine("Rough order of magnitude (mid-level tech/data roles, not a quote—verify): US often leads, Western Europe/Canada/Australia next, then wide ranges in emerging markets by company tier.");
+        sb.AppendLine();
+        sb.AppendLine("Your current recommendation titles (for role-specific research):");
+        foreach (var r in recs.Take(8))
+            sb.AppendLine($"- {r.Title}");
+        sb.AppendLine();
+        sb.AppendLine("If you add an AI API key in appsettings, the chat can tailor numbers to a country you name.");
+        return sb.ToString().TrimEnd();
+    }
+
+    private static bool IsGreeting(string lower)
+    {
+        var t = lower.TrimEnd('.', '!', '?', '…').Trim();
+        return t is "hi" or "hello" or "hey" or "good morning" or "good afternoon" or "good evening"
+            || t.StartsWith("hi ", StringComparison.Ordinal) || t.StartsWith("hello ", StringComparison.Ordinal)
+            || t.StartsWith("hey ", StringComparison.Ordinal) || t == "hiya" || t == "yo";
+    }
 
     private static bool ContainsAny(string haystack, params string[] needles)
     {
@@ -82,22 +186,39 @@ internal static class CareerChatFallback
         return false;
     }
 
+    /// <summary>Words that match many roles if used alone (e.g. "Data" → wrong career).</summary>
+    private static readonly HashSet<string> AmbiguousTitleWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "data", "senior", "junior", "lead", "staff", "software", "web", "cloud", "digital", "product",
+        "business", "machine", "user", "full", "front", "back", "mobile", "ux", "ui", "it", "ai",
+    };
+
     private static RecommendationResponse? FindCareerMention(string userMessage, IReadOnlyList<RecommendationResponse> recs)
     {
-        foreach (var r in recs)
+        if (string.IsNullOrWhiteSpace(userMessage)) return null;
+
+        var orderedByTitleLength = recs
+            .Where(r => !string.IsNullOrWhiteSpace(r.Title))
+            .OrderByDescending(r => r.Title!.Length)
+            .ToList();
+
+        foreach (var r in orderedByTitleLength)
         {
-            if (string.IsNullOrWhiteSpace(r.Title)) continue;
-            if (userMessage.Contains(r.Title, StringComparison.OrdinalIgnoreCase)) return r;
+            if (userMessage.Contains(r.Title!, StringComparison.OrdinalIgnoreCase))
+                return r;
         }
-        foreach (var r in recs)
+
+        foreach (var r in orderedByTitleLength)
         {
-            if (string.IsNullOrWhiteSpace(r.Title)) continue;
-            foreach (var word in r.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var word in r.Title!.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             {
                 if (word.Length < 4) continue;
-                if (userMessage.Contains(word, StringComparison.OrdinalIgnoreCase)) return r;
+                if (AmbiguousTitleWords.Contains(word)) continue;
+                if (userMessage.Contains(word, StringComparison.OrdinalIgnoreCase))
+                    return r;
             }
         }
+
         return null;
     }
 
@@ -108,15 +229,35 @@ internal static class CareerChatFallback
         return $"Hi. I am answering from your current recommendations ({titles}{more}). Ask about salaries, skills, learning paths, or say which role you want to explore.";
     }
 
+    private static bool IsGenericStoredSalary(string? s) =>
+        string.IsNullOrWhiteSpace(s)
+        || s.Equals("See market data", StringComparison.OrdinalIgnoreCase)
+        || s.Equals("n/a", StringComparison.OrdinalIgnoreCase);
+
     private static string BuildSalarySummary(IReadOnlyList<RecommendationResponse> recs)
     {
-        var sb = new StringBuilder("Here is what we have on salary ranges for your recommendations:\n");
-        foreach (var r in recs.Take(8))
+        var rows = recs.Take(8).ToList();
+        if (rows.Count == 0)
+            return "No roles in your list yet. Generate recommendations first.";
+
+        if (rows.All(r => IsGenericStoredSalary(r.SalaryRange)))
         {
-            var sal = string.IsNullOrWhiteSpace(r.SalaryRange) ? "Not specified in your data" : r.SalaryRange;
+            return
+                "Your saved recommendations don’t include specific salary numbers yet (they show as generic placeholders).\n\n"
+                + "What to do:\n"
+                + "- For country or city ranges: ask “salary by country” or use Glassdoor, Levels.fyi, Indeed, or government labour sites.\n"
+                + "- After the database and AI generation run with full metadata, ranges can appear per role.\n\n"
+                + "Roles you’re exploring:\n"
+                + string.Join("\n", rows.Select(r => $"- {r.Title}"));
+        }
+
+        var sb = new StringBuilder("Salary ranges stored with your recommendations:\n");
+        foreach (var r in rows)
+        {
+            var sal = IsGenericStoredSalary(r.SalaryRange) ? "Not specified in your data" : r.SalaryRange!;
             sb.AppendLine($"- {r.Title}: {sal}");
         }
-        sb.Append("These are estimates from your profile; check current job boards for your location.");
+        sb.Append("Verify on current job postings for your country and city.");
         return sb.ToString();
     }
 
@@ -156,7 +297,7 @@ internal static class CareerChatFallback
     private static string BuildCompareSummary(IReadOnlyList<RecommendationResponse> recs)
     {
         var ordered = recs.OrderByDescending(r => r.MatchPercentage ?? 0).ToList();
-        if (ordered.Count == 0) return BuildDefaultSummary(recs, "");
+        if (ordered.Count == 0) return BuildDefaultSummary(recs);
 
         var top = ordered[0];
         var second = ordered.Count > 1 ? ordered[1] : null;
@@ -165,7 +306,39 @@ internal static class CareerChatFallback
             return $"You only have one recommendation in view: {top.Title} ({m1}). Add more by regenerating recommendations.";
 
         var m2 = second.MatchPercentage.HasValue ? $"{second.MatchPercentage}% match" : "match not stored";
-        return $"By stored match scores, {top.Title} ({m1}) ranks ahead of {second.Title} ({m2}). Compare salary ({top.SalaryRange ?? "n/a"} vs {second.SalaryRange ?? "n/a"}) and skills on the cards. Ask about a specific title for more detail.";
+        static string Truncate(string? s, int max)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return "(no description stored)";
+            s = s.Trim();
+            return s.Length <= max ? s : s[..max].TrimEnd() + "…";
+        }
+
+        static bool IsGenericSalary(string? s) =>
+            string.IsNullOrWhiteSpace(s) ||
+            s.Equals("See market data", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("n/a", StringComparison.OrdinalIgnoreCase);
+
+        var sal1 = top.SalaryRange;
+        var sal2 = second.SalaryRange;
+        var salaryLine = "";
+        if (!IsGenericSalary(sal1) && !IsGenericSalary(sal2) &&
+            !string.Equals(sal1, sal2, StringComparison.OrdinalIgnoreCase))
+            salaryLine = $" Salary ranges in your data: {sal1} vs {sal2}.";
+        else if (!IsGenericSalary(sal1) || !IsGenericSalary(sal2))
+            salaryLine = $" Salary hints: {sal1 ?? "n/a"} vs {sal2 ?? "n/a"}.";
+        else
+            salaryLine = " Use job sites for local salary; your cards may not store ranges yet.";
+
+        var skills1 = top.Skills is { Count: > 0 } ? string.Join(", ", top.Skills) : "see card / description";
+        var skills2 = second.Skills is { Count: > 0 } ? string.Join(", ", second.Skills) : "see card / description";
+
+        return
+            $"**Top two by match:** {top.Title} ({m1}) and {second.Title} ({m2}).{salaryLine}\n\n" +
+            $"**{top.Title}** ({top.Category ?? "category n/a"}): {Truncate(top.Description, 160)}\n" +
+            $"Skills: {skills1}\n\n" +
+            $"**{second.Title}** ({second.Category ?? "category n/a"}): {Truncate(second.Description, 160)}\n" +
+            $"Skills: {skills2}\n\n" +
+            "Ask a follow-up about either role (e.g. day-to-day work, first steps to learn).";
     }
 
     private static string BuildSingleCareerParagraph(RecommendationResponse r)
@@ -185,7 +358,7 @@ internal static class CareerChatFallback
         return string.Join(" ", parts);
     }
 
-    private static string BuildDefaultSummary(IReadOnlyList<RecommendationResponse> recs, string originalQuestion)
+    private static string BuildDefaultSummary(IReadOnlyList<RecommendationResponse> recs)
     {
         var sb = new StringBuilder();
         sb.AppendLine("Here is a quick recap of your recommendations. Ask about salary, skills, learning path, or name a specific role.");
@@ -197,10 +370,6 @@ internal static class CareerChatFallback
             if (!string.IsNullOrWhiteSpace(r.SalaryRange)) bits.Add(r.SalaryRange);
             sb.AppendLine($"- {r.Title}: {string.Join(" · ", bits)}");
         }
-        if (!string.IsNullOrWhiteSpace(originalQuestion) && originalQuestion.Length < 120)
-            sb.AppendLine("(I matched your question loosely to this list. For open-ended coaching, add a free Gemini API key — see docs/OPENAI-SETUP.md.)");
-        else
-            sb.AppendLine("(For richer, conversational answers, add a free Gemini API key — see docs/OPENAI-SETUP.md.)");
         return sb.ToString().TrimEnd();
     }
 }

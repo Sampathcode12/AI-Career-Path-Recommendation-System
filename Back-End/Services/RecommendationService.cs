@@ -28,7 +28,7 @@ public class RecommendationService : IRecommendationService
         return list.Select(ToResponse).ToList();
     }
 
-    public async Task<IReadOnlyList<RecommendationResponse>> GenerateAsync(int userId, CancellationToken ct = default)
+    public async Task<RecommendationGenerateResponse> GenerateAsync(int userId, CancellationToken ct = default)
     {
         try
         {
@@ -39,17 +39,18 @@ public class RecommendationService : IRecommendationService
             _logger.LogError(ex, "AI recommendation generation failed for user {UserId}; using template careers.", userId);
             try
             {
-                return await PersistTemplateRecommendationsAsync(userId, ct);
+                var list = await PersistTemplateRecommendationsAsync(userId, ct);
+                return new RecommendationGenerateResponse(list, "template_error");
             }
             catch (Exception ex2)
             {
                 _logger.LogError(ex2, "Could not save template recommendations for user {UserId}; returning in-memory list.", userId);
-                return BuildInMemoryTemplateResponses(userId);
+                return new RecommendationGenerateResponse(BuildInMemoryTemplateResponses(userId), "template_error");
             }
         }
     }
 
-    private async Task<IReadOnlyList<RecommendationResponse>> GenerateCoreAsync(int userId, CancellationToken ct)
+    private async Task<RecommendationGenerateResponse> GenerateCoreAsync(int userId, CancellationToken ct)
     {
         var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
         var profile = await _db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == userId, ct);
@@ -62,6 +63,17 @@ public class RecommendationService : IRecommendationService
         var assessmentSummary = assessment?.ResultSummary ?? assessment?.AnswersJson ?? "No assessment data yet.";
 
         var aiSuggestions = await _openAI.GenerateRecommendationsAsync(profileSummary, assessmentSummary, ct);
+
+        var generationSource = aiSuggestions is { Count: > 0 }
+            ? "ai"
+            : !_openAI.IsLlmAvailable
+                ? "template_no_key"
+                : "template_llm_failed";
+
+        if (generationSource == "template_no_key")
+            _logger.LogWarning("Career generate for user {UserId}: no LLM API key (or Local not used). Using template list. Set AI:Gemini:ApiKey or GEMINI_API_KEY — see docs/OPENAI-SETUP.md.", userId);
+        else if (generationSource == "template_llm_failed")
+            _logger.LogWarning("Career generate for user {UserId}: LLM call failed or returned no parseable JSON. Using template list. Check API key, model name, quota, and network.", userId);
 
         var existing = await _db.CareerRecommendations.Where(x => x.UserId == userId).ToListAsync(ct);
         _db.CareerRecommendations.RemoveRange(existing);
@@ -116,7 +128,8 @@ public class RecommendationService : IRecommendationService
             .Where(x => x.UserId == userId)
             .OrderBy(x => x.SortOrder)
             .ToListAsync(ct);
-        return newList.Select(ToResponse).ToList();
+        var responses = newList.Select(ToResponse).ToList();
+        return new RecommendationGenerateResponse(responses, generationSource);
     }
 
     private async Task<IReadOnlyList<RecommendationResponse>> PersistTemplateRecommendationsAsync(int userId, CancellationToken ct)
@@ -211,14 +224,22 @@ public class RecommendationService : IRecommendationService
             {
                 var historyObjects = BuildChatHistoryObjects(conversationHistory);
                 var degradedContext =
-                    "Database unavailable. The app may show built-in sample careers (Software Developer, Data Analyst, Product Manager, UX Designer, DevOps Engineer). Answer using the user's message; focus on any job title they mention.";
+                    "Database unavailable. The app may show built-in sample careers (Software Developer, Data Analyst, Data Scientist, Product Manager, UX Designer, DevOps Engineer). Answer using the user's message; focus on any job title they mention.";
                 var aiReply = await _openAI.ChatAsync(message, historyObjects, degradedContext, ct);
                 if (!string.IsNullOrWhiteSpace(aiReply))
-                    return aiReply + "\n\n(Note: SQL Server was not reachable — this reply used AI without your saved list. Fix ConnectionStrings:Default in appsettings, e.g. LocalDB, and restart the API.)";
+                {
+                    _logger.LogWarning(
+                        "Chat: database unreachable for user {UserId}; returned AI reply using built-in career context only. Fix ConnectionStrings:Default (SQL Server / LocalDB).",
+                        userId);
+                    return aiReply;
+                }
             }
             catch { /* ignore */ }
 
-            return CareerChatFallback.BuildReplyUsingTemplateCatalog(message);
+            _logger.LogWarning(
+                "Chat: database unreachable for user {UserId}; using rule-based template catalog. Fix ConnectionStrings:Default.",
+                userId);
+            return CareerChatFallback.BuildReplyUsingTemplateCatalog(AugmentMessageWithHistory(message, conversationHistory));
         }
 
         try
@@ -229,14 +250,14 @@ public class RecommendationService : IRecommendationService
             var historyObjects = BuildChatHistoryObjects(conversationHistory);
             var aiReply = await _openAI.ChatAsync(message, historyObjects, context, ct);
             if (!string.IsNullOrWhiteSpace(aiReply)) return aiReply;
-            return CareerChatFallback.BuildReply(message, recommendations);
+            return CareerChatFallback.BuildReply(AugmentMessageWithHistory(message, conversationHistory), recommendations);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Chat: unexpected error for user {UserId}", userId);
             try
             {
-                return CareerChatFallback.BuildReply(message, recommendations);
+                return CareerChatFallback.BuildReply(AugmentMessageWithHistory(message, conversationHistory), recommendations);
             }
             catch (Exception ex2)
             {
@@ -252,11 +273,30 @@ public class RecommendationService : IRecommendationService
         foreach (var h in conversationHistory)
         {
             if (h == null) continue;
-            var role = string.IsNullOrWhiteSpace(h.Role) ? "user" : h.Role.Trim();
+            var role = string.IsNullOrWhiteSpace(h.Role) ? "user" : h.Role.Trim().ToLowerInvariant();
+            if (role == "model") role = "assistant";
+            if (role != "assistant" && role != "user") role = "user";
             var content = h.Content ?? "";
             list.Add(new { role, content });
         }
         return list;
+    }
+
+    /// <summary>Prepends recent turns so rule-based fallback can answer follow-ups (e.g. ""what about the second one?"").</summary>
+    private static string AugmentMessageWithHistory(string message, IReadOnlyList<ChatMessageDto> history)
+    {
+        if (history == null || history.Count == 0) return message;
+        var lines = new List<string>();
+        foreach (var h in history.TakeLast(12))
+        {
+            var r = string.IsNullOrWhiteSpace(h.Role) ? "user" : h.Role.Trim();
+            var c = (h.Content ?? "").Trim();
+            if (c.Length == 0) continue;
+            if (c.Length > 600) c = c[..600] + "…";
+            lines.Add($"{r}: {c}");
+        }
+        if (lines.Count == 0) return message;
+        return "Earlier in this chat:\n" + string.Join("\n", lines) + "\n\nCurrent message: " + message;
     }
 
     public async Task<RecommendationResponse?> UpdateSavedAsync(int userId, int recommendationId, bool saved, CancellationToken ct = default)

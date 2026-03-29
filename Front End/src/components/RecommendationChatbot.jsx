@@ -2,7 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChatIcon, CloseIcon } from './Icons';
 import './RecommendationChatbot.css';
 
-const RecommendationChatbot = ({ onSend, chatHistory, chatLoading, disabled, open, onOpenChange, showFloatingButton = true }) => {
+const RecommendationChatbot = ({
+  onSend,
+  onNewChat,
+  chatHistory,
+  chatLoading,
+  disabled,
+  open,
+  onOpenChange,
+  showFloatingButton = true,
+}) => {
   const isControlled = open !== undefined;
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = isControlled ? open : internalOpen;
@@ -48,23 +57,36 @@ const RecommendationChatbot = ({ onSend, chatHistory, chatLoading, disabled, ope
               <span className="recommendation-chatbot-avatar">AI</span>
               <div>
                 <strong>Career Advisor</strong>
-                <span className="recommendation-chatbot-subtitle">Ask about your recommendations</span>
+                <span className="recommendation-chatbot-subtitle">Multi-turn chat — continue like ChatGPT / Gemini</span>
               </div>
             </div>
-            <button
-              type="button"
-              className="recommendation-chatbot-close"
-              onClick={() => setOpen(false)}
-              aria-label="Close chat"
-            >
-              <CloseIcon size={20} color="currentColor" />
-            </button>
+            <div className="recommendation-chatbot-header-actions">
+              {onNewChat && chatHistory.length > 0 && (
+                <button
+                  type="button"
+                  className="recommendation-chatbot-new-chat"
+                  onClick={() => !chatLoading && onNewChat()}
+                  disabled={chatLoading}
+                  title="Clear history and start a new conversation"
+                >
+                  New chat
+                </button>
+              )}
+              <button
+                type="button"
+                className="recommendation-chatbot-close"
+                onClick={() => setOpen(false)}
+                aria-label="Close chat"
+              >
+                <CloseIcon size={20} color="currentColor" />
+              </button>
+            </div>
           </div>
 
           <div className="recommendation-chatbot-messages">
             {chatHistory.length === 0 ? (
               <div className="recommendation-chatbot-welcome">
-                <p>Hi! I can help you explore your career recommendations.</p>
+                <p>Hi! Ask anything about your recommendations — then keep chatting; earlier messages stay in context.</p>
                 <p>Try asking:</p>
                 <ul>
                   <li>Tell me more about Data Scientist</li>
@@ -105,7 +127,7 @@ const RecommendationChatbot = ({ onSend, chatHistory, chatLoading, disabled, ope
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Type your question..."
+              placeholder="Ask a follow-up…"
               disabled={chatLoading || disabled}
             />
             <button

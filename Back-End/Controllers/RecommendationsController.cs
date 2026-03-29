@@ -37,8 +37,8 @@ public class RecommendationsController : ControllerBase
     {
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
-        var list = await _recommendationService.GenerateAsync(userId.Value, ct);
-        return Ok(list);
+        var result = await _recommendationService.GenerateAsync(userId.Value, ct);
+        return Ok(result);
     }
 
     [HttpGet]

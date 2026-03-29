@@ -88,10 +88,18 @@ export const recommendationsAPI = {
   save: (id, saved) => apiCall(`/recommendations/${id}/save?saved=${saved}`, {
     method: 'PUT',
   }),
-  chat: (message, conversationHistory = []) => apiCall('/recommendations/chat', {
-    method: 'POST',
-    body: { message, conversationHistory },
-  }),
+  chat: (message, conversationHistory = []) =>
+    apiCall('/recommendations/chat', {
+      method: 'POST',
+      body: {
+        message,
+        // Backend accepts camelCase or snake_case; snake_case matches ConfigureHttpJsonOptions / ChatRequest
+        conversation_history: (conversationHistory || []).map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      },
+    }),
 };
 
 // Jobs API

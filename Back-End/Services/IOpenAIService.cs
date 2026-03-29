@@ -3,6 +3,9 @@ namespace BackEnd.Services;
 /// <summary>AI service for career recommendations. Uses OpenAI API or an OpenAI-compatible local server (e.g. Ollama) when configured; otherwise returns null (template fallback).</summary>
 public interface IOpenAIService
 {
+    /// <summary>True when a non-empty API key is set (or Local provider without requiring a key).</summary>
+    bool IsLlmAvailable { get; }
+
     /// <summary>Generate career recommendations from profile + assessment. Returns null if no LLM is configured or the call fails.</summary>
     Task<IReadOnlyList<AICareerSuggestion>?> GenerateRecommendationsAsync(string profileSummary, string assessmentSummary, CancellationToken ct = default);
 

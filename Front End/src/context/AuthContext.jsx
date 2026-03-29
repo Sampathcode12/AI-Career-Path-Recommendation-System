@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { authAPI } from '../services/api';
+import { authAPI, getStoredAccessToken } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -8,36 +8,39 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      authAPI.getCurrentUser()
-        .then(userData => {
-          setUser(userData);
-        })
-        .catch((err) => {
-          if (err?.status === 401) {
-            localStorage.removeItem('access_token');
-          }
-          setUser(null);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    } else {
+    const token = getStoredAccessToken();
+    if (!token) {
+      if (localStorage.getItem('access_token')) localStorage.removeItem('access_token');
       setLoading(false);
+      return;
     }
+    authAPI
+      .getCurrentUser()
+      .then((userData) => {
+        setUser(userData);
+      })
+      .catch((err) => {
+        if (err?.status === 401) {
+          localStorage.removeItem('access_token');
+        }
+        setUser(null);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   const login = async (email, password) => {
     try {
       const response = await authAPI.login({ email, password });
-      
-      // Store token
-      localStorage.setItem('access_token', response.access_token);
-      
-      // Store user data
-      setUser(response.user);
-      
+      // API returns camelCase (accessToken); snake_case supported if backend is configured that way
+      const token = response.access_token ?? response.accessToken;
+      if (!token || token === 'undefined') {
+        throw new Error('Login did not return a token. Check API configuration.');
+      }
+      localStorage.setItem('access_token', token);
+      const userPayload = response.user ?? response.User;
+      setUser(userPayload);
       return response;
     } catch (error) {
       throw error;

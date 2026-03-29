@@ -29,8 +29,10 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login-json")]
-    public async Task<IActionResult> LoginJson([FromBody] LoginRequest request, CancellationToken ct)
+    public async Task<IActionResult> LoginJson([FromBody] LoginRequest? request, CancellationToken ct)
     {
+        if (request == null)
+            return BadRequest(new { detail = "Request body must be JSON with email and password." });
         var response = await _authService.LoginAsync(request, ct);
         if (response == null)
             return Unauthorized(new { detail = "Invalid email or password." });
