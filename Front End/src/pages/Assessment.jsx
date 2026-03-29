@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { assessmentAPI, skillGapAPI } from '../services/api';
 import './PageStyles.css';
 
@@ -63,6 +63,7 @@ const buildResultSummary = (data, industries = []) => {
 
 const Assessment = () => {
   const navigate = useNavigate();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [industry, setIndustry] = useState('technology');
   const [industries, setIndustries] = useState([]);
@@ -327,6 +328,15 @@ const Assessment = () => {
 
   return (
     <section className="page-section">
+      <div className="card">
+        <h2>Career background</h2>
+        <p className="page-lede">
+          Enter your survey once on the{' '}
+          <Link to="/career-survey">career survey</Link>
+          {' '}page — it is saved to your profile and used together with this skill assessment for AI recommendations.
+        </p>
+      </div>
+
       <div className="card">
         <h2>Comprehensive Skill Assessment</h2>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9375rem' }}>

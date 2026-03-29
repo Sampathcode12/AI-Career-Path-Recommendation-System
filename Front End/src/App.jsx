@@ -10,6 +10,7 @@ import SignUp from './pages/SignUp';
 import Home from './pages/Home';
 import Profile from './pages/Profile';
 import Assessment from './pages/Assessment';
+import CareerSurvey from './pages/CareerSurvey';
 import Recommendation from './pages/Recommendation';
 import Dashboard from './pages/Dashboard';
 import JobSearch from './pages/JobSearch';
@@ -59,6 +60,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/career-survey"
+            element={
+              <ProtectedRoute>
+                <CareerSurvey />
               </ProtectedRoute>
             }
           />

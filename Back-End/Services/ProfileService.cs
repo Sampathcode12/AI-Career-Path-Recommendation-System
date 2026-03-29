@@ -59,7 +59,9 @@ public class ProfileService : IProfileService
     public async Task<ProfileResponse?> UpdateAsync(int userId, ProfileCreateOrUpdateRequest request, CancellationToken ct = default)
     {
         var profile = await _db.UserProfiles.Include(x => x.User).FirstOrDefaultAsync(x => x.UserId == userId, ct);
-        if (profile == null) return null;
+        // Upsert: survey "Save" often uses PUT; create row if missing (avoids 404 after reset DB or first-time race).
+        if (profile == null)
+            return await CreateAsync(userId, request, ct);
 
         if (!string.IsNullOrWhiteSpace(request.DisplayName) && profile.User != null)
             profile.User.Name = request.DisplayName.Trim();

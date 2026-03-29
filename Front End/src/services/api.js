@@ -1,8 +1,15 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 // Helper function for API calls
+/** Exported so AuthContext can ignore corrupted token values (e.g. literal "undefined" from a past bug). */
+export function getStoredAccessToken() {
+  const raw = localStorage.getItem('access_token');
+  if (!raw || raw === 'undefined' || raw === 'null') return null;
+  return raw;
+}
+
 async function apiCall(endpoint, options = {}) {
-  const token = localStorage.getItem('access_token');
+  const token = getStoredAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
@@ -83,7 +90,7 @@ export const recommendationsAPI = {
   }),
   chat: (message, conversationHistory = []) => apiCall('/recommendations/chat', {
     method: 'POST',
-    body: { message, conversation_history: conversationHistory },
+    body: { message, conversationHistory },
   }),
 };
 

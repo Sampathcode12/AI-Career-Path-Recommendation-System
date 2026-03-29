@@ -34,7 +34,6 @@ const Home = () => {
   const { user } = useAuth();
   const [profileProgress, setProfileProgress] = useState(45);
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
-
   useEffect(() => {
     // Simulate checking profile completion
     const progress = localStorage.getItem('profileProgress');
@@ -51,8 +50,8 @@ const Home = () => {
     navigate('/profile');
   };
 
-  const handleAssessment = () => {
-    navigate('/assessment');
+  const goToCareerSurvey = () => {
+    navigate('/career-survey');
   };
 
   const progressData = {
@@ -98,9 +97,9 @@ const Home = () => {
           Your personalized career journey. This scalable web-based system offers real-time job market analysis, multi-career path exploration, AI-based recommendations, and industry skill gap analysis.
         </p>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
-          <button onClick={handleGetStarted}>Complete Your Profile</button>
-          <button onClick={handleAssessment}>
-            {assessmentCompleted ? 'Retake Assessment' : 'Take Assessment'}
+          <button type="button" className="btn btn-primary" onClick={handleGetStarted}>Complete Your Profile</button>
+          <button type="button" className="btn btn-primary" onClick={goToCareerSurvey}>
+            {assessmentCompleted ? 'Retake career survey' : 'Take career survey'}
           </button>
         </div>
       </div>

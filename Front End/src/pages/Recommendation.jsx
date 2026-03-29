@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Bar, Radar } from 'react-chartjs-2';
 import { CheckIcon, ChatIcon } from '../components/Icons';
 import RecommendationChatbot from '../components/RecommendationChatbot';
-import { recommendationsAPI, profileAPI } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { recommendationsAPI } from '../services/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -19,82 +18,6 @@ import {
   Filler,
 } from 'chart.js';
 import './PageStyles.css';
-
-const RECOMMENDATION_SKILL_OPTIONS = [
-  'Programming / coding',
-  'Data analysis',
-  'Machine learning / AI',
-  'Communication',
-  'Project management',
-  'Research',
-  'Teaching / training',
-  'Design / UX',
-  'Sales / marketing',
-  'Finance / accounting',
-  'Leadership',
-  'Problem solving',
-  'Writing',
-  'Public speaking',
-];
-
-function parseSkillsString(s) {
-  if (!s || typeof s !== 'string') return [];
-  return s.split(',').map((x) => x.trim()).filter(Boolean);
-}
-
-function mapProfileToRecForm(profile, user) {
-  const snap = profile || null;
-  const allSkills = parseSkillsString(snap?.skills);
-  const selectedSkills = allSkills.filter((s) => RECOMMENDATION_SKILL_OPTIONS.includes(s));
-  const otherSkills = allSkills.filter((s) => !RECOMMENDATION_SKILL_OPTIONS.includes(s)).join(', ');
-  return {
-    displayName: (snap?.display_name ?? user?.name ?? '').trim(),
-    gender: snap?.gender ?? '',
-    ugCourse: snap?.ug_course ?? '',
-    ugSpecialization: snap?.ug_specialization ?? '',
-    interests: snap?.interests ?? '',
-    selectedSkills,
-    otherSkills,
-    ugCgpaOrPercentage: snap?.ug_cgpa_or_percentage ?? '',
-    hasCerts: snap?.has_additional_certifications === true ? 'yes' : snap?.has_additional_certifications === false ? 'no' : '',
-    certTitles: snap?.certificate_course_titles ?? '',
-    isWorking: snap?.is_working === true ? 'yes' : snap?.is_working === false ? 'no' : '',
-    firstJobTitle: snap?.first_job_title ?? '',
-    mastersField: snap?.masters_field ?? '',
-  };
-}
-
-function mergeSkillsForPayload(form) {
-  const extra = parseSkillsString(form.otherSkills);
-  return [...new Set([...(form.selectedSkills || []), ...extra])];
-}
-
-function buildProfilePayloadFromRecForm(form, snapshot) {
-  const base = snapshot || {};
-  const merged = mergeSkillsForPayload(form);
-  const skillsStr = merged.length ? merged.join(', ') : null;
-  return {
-    display_name: form.displayName?.trim() || null,
-    skills: skillsStr ?? base.skills ?? null,
-    interests: form.interests?.trim() || base.interests || null,
-    experience_level: base.experience_level ?? null,
-    education: base.education ?? null,
-    preferred_industries: base.preferred_industries ?? null,
-    location: base.location ?? null,
-    bio: base.bio ?? null,
-    linked_in_url: base.linked_in_url ?? null,
-    portfolio_url: base.portfolio_url ?? null,
-    gender: form.gender?.trim() || null,
-    ug_course: form.ugCourse?.trim() || null,
-    ug_specialization: form.ugSpecialization?.trim() || null,
-    ug_cgpa_or_percentage: form.ugCgpaOrPercentage?.trim() || null,
-    has_additional_certifications: form.hasCerts === 'yes' ? true : form.hasCerts === 'no' ? false : null,
-    certificate_course_titles: form.certTitles?.trim() || null,
-    is_working: form.isWorking === 'yes' ? true : form.isWorking === 'no' ? false : null,
-    first_job_title: form.firstJobTitle?.trim() || null,
-    masters_field: form.mastersField?.trim() || null,
-  };
-}
 
 ChartJS.register(
   CategoryScale,
@@ -112,8 +35,8 @@ ChartJS.register(
 const mapApiToCareer = (r) => ({
   id: r.id,
   title: r.title,
-  match: r.match_percentage ?? 75,
-  salary: r.salary_range ?? 'N/A',
+  match: r.match_percentage ?? r.matchPercentage ?? 75,
+  salary: r.salary_range ?? r.salaryRange ?? 'N/A',
   growth: r.growth ?? '',
   description: r.description ?? '',
   skills: r.skills ?? [],
@@ -122,7 +45,7 @@ const mapApiToCareer = (r) => ({
     experience: '1-5 years',
     certifications: [],
   },
-  learningPath: (r.learning_path ?? []).map((lp) => ({
+  learningPath: (r.learning_path ?? r.learningPath ?? []).map((lp) => ({
     step: lp.step,
     title: lp.title,
     duration: lp.duration ?? '',
@@ -138,8 +61,9 @@ const SAMPLE_RECOMMENDATIONS = [
 
 const Recommendation = () => {
   const location = useLocation();
-  const { user } = useAuth();
   const fromAssessment = location.state?.fromAssessment === true;
+  const fromCareerSurvey = location.state?.fromCareerSurvey === true;
+  const regenerateOnLoad = fromAssessment || fromCareerSurvey;
   const [careers, setCareers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -147,77 +71,46 @@ const Recommendation = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [recForm, setRecForm] = useState(() => mapProfileToRecForm(null, null));
-  const [profileSnapshot, setProfileSnapshot] = useState(null);
-  const [profileFormLoading, setProfileFormLoading] = useState(true);
-  const [recFormError, setRecFormError] = useState('');
+  const [pendingAskCareer, setPendingAskCareer] = useState(null);
+  /** True when API failed or UI is showing sample / offline template rows. */
+  const [usingTemplateRecommendations, setUsingTemplateRecommendations] = useState(false);
 
-  const persistRecProfile = useCallback(async (form, snap) => {
-    const payload = buildProfilePayloadFromRecForm(form, snap);
-    if (snap) {
-      const updated = await profileAPI.update(payload);
-      setProfileSnapshot(updated);
-    } else {
-      const created = await profileAPI.create({
-        ...payload,
-        preferred_industries: payload.preferred_industries || 'technology',
-        interests: payload.interests || 'General / exploring careers',
-        skills: payload.skills || 'Not specified',
-      });
-      setProfileSnapshot(created);
-    }
+  const applyRecommendationList = useCallback((rawList, fromApiError) => {
+    const genList = Array.isArray(rawList) ? rawList.map(mapApiToCareer) : [];
+    const list =
+      genList.length > 0
+        ? genList
+        : SAMPLE_RECOMMENDATIONS.map((c, i) => ({ ...c, id: -(i + 1) }));
+    setUsingTemplateRecommendations(Boolean(fromApiError || list.some((c) => c.id < 0)));
+    setCareers(list);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     async function init() {
       setLoading(true);
-      setProfileFormLoading(true);
-      let snap = null;
+      setUsingTemplateRecommendations(false);
       try {
-        try {
-          snap = await profileAPI.get();
-        } catch (pe) {
-          if (pe?.status !== 404) console.error(pe);
-        }
-        if (cancelled) return;
-        setProfileSnapshot(snap);
-        setRecForm(mapProfileToRecForm(snap, user));
-      } finally {
-        if (!cancelled) setProfileFormLoading(false);
-      }
-
-      try {
-        if (fromAssessment) {
-          const formVals = mapProfileToRecForm(snap, user);
-          await persistRecProfile(formVals, snap);
-          if (cancelled) return;
-          try {
-            const refreshed = await profileAPI.get();
-            if (!cancelled) setProfileSnapshot(refreshed);
-          } catch {
-            /* ignore */
-          }
+        if (regenerateOnLoad) {
           const gen = await recommendationsAPI.generate();
-          const genList = Array.isArray(gen) ? gen.map(mapApiToCareer) : [];
-          if (!cancelled) setCareers(genList.length > 0 ? genList : SAMPLE_RECOMMENDATIONS);
+          if (!cancelled) applyRecommendationList(gen, false);
         } else {
           const data = await recommendationsAPI.getAll();
           const list = Array.isArray(data) ? data.map(mapApiToCareer) : [];
           if (cancelled) return;
           if (list.length > 0) {
             setCareers(list);
+            setUsingTemplateRecommendations(list.some((c) => c.id < 0));
           } else {
             const gen = await recommendationsAPI.generate();
-            const genList = Array.isArray(gen) ? gen.map(mapApiToCareer) : [];
             if (cancelled) return;
-            setCareers(genList.length > 0 ? genList : SAMPLE_RECOMMENDATIONS);
+            applyRecommendationList(gen, false);
           }
         }
       } catch (err) {
         if (!cancelled) {
           console.error(err);
-          setCareers(SAMPLE_RECOMMENDATIONS);
+          applyRecommendationList([], true);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -225,43 +118,24 @@ const Recommendation = () => {
     }
     init();
     return () => { cancelled = true; };
-  }, [fromAssessment, user, persistRecProfile]);
-
-  const toggleSkill = (skill) => {
-    setRecForm((prev) => {
-      const next = new Set(prev.selectedSkills);
-      if (next.has(skill)) next.delete(skill);
-      else next.add(skill);
-      return { ...prev, selectedSkills: Array.from(next) };
-    });
-  };
+  }, [regenerateOnLoad, applyRecommendationList]);
 
   const handleGenerate = async () => {
-    setRecFormError('');
-    if (!recForm.interests?.trim()) {
-      setRecFormError('Please describe your interests.');
-      return;
-    }
-    if (!mergeSkillsForPayload(recForm).length) {
-      setRecFormError('Select at least one skill and/or enter additional skills (comma-separated).');
-      return;
-    }
     setGenerating(true);
     setChatHistory([]);
     try {
-      await persistRecProfile(recForm, profileSnapshot);
       const data = await recommendationsAPI.generate();
-      const list = Array.isArray(data) ? data.map(mapApiToCareer) : [];
-      setCareers(list.length > 0 ? list : SAMPLE_RECOMMENDATIONS);
+      applyRecommendationList(data, false);
     } catch (err) {
       console.error(err);
-      setCareers(SAMPLE_RECOMMENDATIONS);
+      applyRecommendationList([], true);
     } finally {
       setGenerating(false);
     }
   };
 
   const toggleSave = async (careerId, currentlySaved) => {
+    if (careerId < 0) return;
     try {
       await recommendationsAPI.save(careerId, !currentlySaved);
       setCareers((prev) =>
@@ -272,6 +146,20 @@ const Recommendation = () => {
     }
   };
 
+  const askAboutCareer = (careerTitle) => {
+    setChatOpen(true);
+    setPendingAskCareer(careerTitle);
+  };
+
+  useEffect(() => {
+    if (pendingAskCareer && chatOpen && !chatLoading) {
+      const title = pendingAskCareer;
+      setPendingAskCareer(null);
+      handleChatSend(`Tell me more about ${title}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAskCareer, chatOpen, chatLoading]);
+
   const handleChatSend = async (msg) => {
     const message = (typeof msg === 'string' ? msg : '').trim();
     if (!message || chatLoading) return;
@@ -279,12 +167,12 @@ const Recommendation = () => {
     setChatHistory((h) => [...h, userEntry]);
     setChatLoading(true);
     try {
-      const historyForApi = [...chatHistory, userEntry].map((m) => ({
+      const historyForApi = chatHistory.map((m) => ({
         role: m.role,
         content: m.content,
       }));
       const res = await recommendationsAPI.chat(message, historyForApi);
-      const reply = res?.reply ?? 'Sorry, I could not get a response. Make sure OpenAI:ApiKey is configured.';
+      const reply = res?.reply ?? 'Sorry, I could not get a response. Try again in a moment.';
       setChatHistory((h) => [...h, { role: 'assistant', content: reply }]);
     } catch (err) {
       console.error(err);
@@ -292,7 +180,7 @@ const Recommendation = () => {
       let displayMsg = errMsg;
       if (errMsg.includes('401')) displayMsg = 'Please log in again.';
       else if (errMsg.includes('403')) displayMsg = 'Access denied.';
-      else if (errMsg.includes('503') || errMsg.toLowerCase().includes('unavailable')) displayMsg = 'AI service unavailable. Add OpenAI:ApiKey to configuration (see docs/OPENAI-SETUP.md).';
+      else if (errMsg.includes('503') || errMsg.toLowerCase().includes('unavailable')) displayMsg = 'The server could not complete chat right now. Check that the backend is running and try again.';
       else if (errMsg.includes('API request failed') || errMsg.includes('Failed to fetch')) displayMsg = 'Could not reach the server. Make sure the backend is running at http://localhost:8000 and try again.';
       setChatHistory((h) => [
         ...h,
@@ -369,209 +257,31 @@ const Recommendation = () => {
     <section className="page-section">
       <div className="card">
         <h2>AI-Based Career Recommendation</h2>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-          Fill in the questionnaire below (aligned with our career survey). Your answers are saved to your profile and used with your assessment to generate recommendations.
+        <p className="page-lede" style={{ marginBottom: '1.25rem' }}>
+          Recommendations use your saved profile and skill assessment. Update your career background anytime on the{' '}
+          <Link to="/career-survey">career survey</Link> page, then generate or regenerate below.
         </p>
 
-        {profileFormLoading ? (
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Loading your profile…</p>
-        ) : (
-          <div
-            className="recommendation-input-form"
+        {usingTemplateRecommendations && !loading && (
+          <p
+            role="status"
             style={{
-              marginBottom: '1.75rem',
-              padding: '1.25rem',
-              background: 'var(--bg-primary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-light)',
+              marginBottom: '1.25rem',
+              padding: '0.75rem 1rem',
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.9rem',
+              color: 'var(--text)',
             }}
           >
-            {recFormError && (
-              <div className="error-message" style={{ marginBottom: '1rem' }} role="alert">
-                {recFormError}
-              </div>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-              <div className="form-group">
-                <label htmlFor="rec-name">What is your name?</label>
-                <input
-                  id="rec-name"
-                  type="text"
-                  value={recForm.displayName}
-                  onChange={(e) => setRecForm((f) => ({ ...f, displayName: e.target.value }))}
-                  placeholder="Your name"
-                  autoComplete="name"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="rec-gender">What is your gender?</label>
-                <select
-                  id="rec-gender"
-                  value={recForm.gender}
-                  onChange={(e) => setRecForm((f) => ({ ...f, gender: e.target.value }))}
-                >
-                  <option value="">Select</option>
-                  <option value="Female">Female</option>
-                  <option value="Male">Male</option>
-                  <option value="Non-binary">Non-binary</option>
-                  <option value="Prefer not to say">Prefer not to say</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="rec-ug-course">What was your course in UG?</label>
-                <input
-                  id="rec-ug-course"
-                  type="text"
-                  value={recForm.ugCourse}
-                  onChange={(e) => setRecForm((f) => ({ ...f, ugCourse: e.target.value }))}
-                  placeholder="e.g. B.Sc. Computer Science"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="rec-ug-spec">UG specialization / major subject</label>
-                <input
-                  id="rec-ug-spec"
-                  type="text"
-                  value={recForm.ugSpecialization}
-                  onChange={(e) => setRecForm((f) => ({ ...f, ugSpecialization: e.target.value }))}
-                  placeholder="e.g. Mathematics"
-                />
-              </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label htmlFor="rec-interests">What are your interests?</label>
-                <textarea
-                  id="rec-interests"
-                  rows={3}
-                  value={recForm.interests}
-                  onChange={(e) => setRecForm((f) => ({ ...f, interests: e.target.value }))}
-                  placeholder="Career areas, domains, or activities you enjoy"
-                />
-              </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label>What are your skills? (select any; add more below)</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  {RECOMMENDATION_SKILL_OPTIONS.map((skill) => (
-                    <label
-                      key={skill}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        padding: '0.35rem 0.65rem',
-                        borderRadius: '999px',
-                        border: `1px solid ${recForm.selectedSkills.includes(skill) ? 'var(--accent)' : 'var(--border-light)'}`,
-                        background: recForm.selectedSkills.includes(skill) ? 'rgba(13, 115, 119, 0.1)' : 'transparent',
-                        fontSize: '0.875rem',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={recForm.selectedSkills.includes(skill)}
-                        onChange={() => toggleSkill(skill)}
-                      />
-                      <span>{skill}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label htmlFor="rec-skills-extra">Additional skills (comma-separated)</label>
-                <input
-                  id="rec-skills-extra"
-                  type="text"
-                  value={recForm.otherSkills}
-                  onChange={(e) => setRecForm((f) => ({ ...f, otherSkills: e.target.value }))}
-                  placeholder="e.g. Python, SQL, Figma"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="rec-cgpa">Average CGPA or percentage (UG)</label>
-                <input
-                  id="rec-cgpa"
-                  type="text"
-                  value={recForm.ugCgpaOrPercentage}
-                  onChange={(e) => setRecForm((f) => ({ ...f, ugCgpaOrPercentage: e.target.value }))}
-                  placeholder="e.g. 3.5 / 75%"
-                />
-              </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <span style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Did you do any certification courses additionally?</span>
-                <label style={{ marginRight: '1.25rem' }}>
-                  <input
-                    type="radio"
-                    name="rec-certs"
-                    checked={recForm.hasCerts === 'yes'}
-                    onChange={() => setRecForm((f) => ({ ...f, hasCerts: 'yes' }))}
-                  />
-                  {' '}Yes
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="rec-certs"
-                    checked={recForm.hasCerts === 'no'}
-                    onChange={() => setRecForm((f) => ({ ...f, hasCerts: 'no' }))}
-                  />
-                  {' '}No
-                </label>
-              </div>
-              {recForm.hasCerts === 'yes' && (
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label htmlFor="rec-cert-titles">Certificate course title(s)</label>
-                  <input
-                    id="rec-cert-titles"
-                    type="text"
-                    value={recForm.certTitles}
-                    onChange={(e) => setRecForm((f) => ({ ...f, certTitles: e.target.value }))}
-                    placeholder="e.g. AWS Cloud Practitioner"
-                  />
-                </div>
-              )}
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <span style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Are you working?</span>
-                <label style={{ marginRight: '1.25rem' }}>
-                  <input
-                    type="radio"
-                    name="rec-work"
-                    checked={recForm.isWorking === 'yes'}
-                    onChange={() => setRecForm((f) => ({ ...f, isWorking: 'yes' }))}
-                  />
-                  {' '}Yes
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="rec-work"
-                    checked={recForm.isWorking === 'no'}
-                    onChange={() => setRecForm((f) => ({ ...f, isWorking: 'no' }))}
-                  />
-                  {' '}No
-                </label>
-              </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label htmlFor="rec-first-job">First job title in your current field (if working); otherwise NA</label>
-                <input
-                  id="rec-first-job"
-                  type="text"
-                  value={recForm.firstJobTitle}
-                  onChange={(e) => setRecForm((f) => ({ ...f, firstJobTitle: e.target.value }))}
-                  placeholder="e.g. Junior Analyst or NA"
-                />
-              </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label htmlFor="rec-masters">Masters after UG? If yes, mention field (e.g. Masters in Mathematics)</label>
-                <input
-                  id="rec-masters"
-                  type="text"
-                  value={recForm.mastersField}
-                  onChange={(e) => setRecForm((f) => ({ ...f, mastersField: e.target.value }))}
-                  placeholder="Leave blank if no masters"
-                />
-              </div>
-            </div>
-          </div>
+            <strong>Demo / fallback:</strong> These careers are template examples (not from your AI model) because the
+            generate request could not reach an AI provider. Add a free{' '}
+            <strong>Gemini API key</strong> (or Groq / OpenAI / Ollama) in{' '}
+            <code style={{ fontSize: '0.85em' }}>appsettings.json → AI</code> — see{' '}
+            <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>
+            — then click Regenerate.
+          </p>
         )}
 
         {careers.length === 0 && !loading && (
@@ -582,7 +292,7 @@ const Recommendation = () => {
             <button
               className="btn btn-primary"
               onClick={handleGenerate}
-              disabled={generating || profileFormLoading}
+              disabled={generating}
             >
               {generating ? 'Generating...' : 'Generate Recommendations'}
             </button>
@@ -592,7 +302,7 @@ const Recommendation = () => {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setCareers(SAMPLE_RECOMMENDATIONS)}
+              onClick={() => applyRecommendationList([], true)}
               style={{ marginTop: '0.5rem' }}
             >
               Show Sample Recommendations
@@ -605,7 +315,7 @@ const Recommendation = () => {
             <button
               className="btn btn-secondary"
               onClick={handleGenerate}
-              disabled={generating || profileFormLoading}
+              disabled={generating}
               style={{ marginRight: '0.5rem' }}
             >
               {generating ? 'Regenerating...' : 'Regenerate'}
@@ -615,7 +325,11 @@ const Recommendation = () => {
 
         {loading ? (
           <p style={{ color: 'var(--text-secondary)' }}>
-            {fromAssessment ? 'Generating recommendations based on your assessment…' : 'Loading recommendations…'}
+            {fromCareerSurvey
+              ? 'Generating recommendations from your career survey…'
+              : fromAssessment
+                ? 'Generating recommendations based on your assessment…'
+                : 'Loading recommendations…'}
           </p>
         ) : (
           <>
@@ -660,7 +374,7 @@ const Recommendation = () => {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setChatOpen(true);
+                          askAboutCareer(career.title);
                         }}
                         style={{
                           padding: '0.5rem 1rem',
@@ -718,7 +432,7 @@ const Recommendation = () => {
             <h3 style={{ margin: 0 }}>{selectedCareer.title} - Detailed Analysis</h3>
             <button
               type="button"
-              onClick={() => setChatOpen(true)}
+              onClick={() => askAboutCareer(selectedCareer.title)}
               style={{
                 padding: '0.5rem 1rem',
                 background: 'transparent',

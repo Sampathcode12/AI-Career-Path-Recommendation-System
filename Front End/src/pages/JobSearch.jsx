@@ -11,15 +11,17 @@ const JobSearch = () => {
   const [loading, setLoading] = useState(true);
   const [savedIds, setSavedIds] = useState([]);
 
+  const searchPayload = () => ({
+    query: searchTerm.trim() || undefined,
+    location: location.trim() || undefined,
+    category: category === 'All' ? undefined : category,
+    sector: undefined,
+  });
+
   const search = async () => {
     setLoading(true);
     try {
-      const data = await jobsAPI.search({
-        query: searchTerm || undefined,
-        location: location || undefined,
-        category: category === 'All' ? undefined : category,
-        sector: undefined,
-      });
+      const data = await jobsAPI.search(searchPayload());
       setJobs(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
@@ -29,9 +31,26 @@ const JobSearch = () => {
     }
   };
 
+  /** Refetch whenever job category changes (latest search keywords + location from this render). */
   useEffect(() => {
-    search();
-  }, []);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const data = await jobsAPI.search(searchPayload());
+        if (!cancelled) setJobs(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setJobs([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: category drives auto-search; keywords/location use Search button
+  }, [category]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -75,7 +94,9 @@ const JobSearch = () => {
       <div className="card">
         <h2>Job Search & Career Details</h2>
         <p className="page-lede">
-          Search roles across all industries — {JOB_SEARCH_INDUSTRIES_LEDE} Filters match the same categories used on Top 10 Jobs and recommendations.
+          Search roles across all industries — {JOB_SEARCH_INDUSTRIES_LEDE} Choosing a <strong>job category</strong> reloads
+          results immediately (with your current keywords and location). Use <strong>Search</strong> after changing those
+          fields. Categories match Top 10 Jobs and recommendations.
         </p>
         <form onSubmit={handleSearch} className="job-filter-toolbar">
           <div className="form-group form-group--toolbar form-group--grow">

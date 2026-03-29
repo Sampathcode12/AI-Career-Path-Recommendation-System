@@ -108,26 +108,36 @@ const Profile = () => {
           : [];
         setFormData(prev => ({
           ...prev,
-          fullName: profile.display_name ?? user.name ?? prev.fullName,
+          fullName: profile.display_name ?? profile.displayName ?? user.name ?? prev.fullName,
           email: user.email || prev.email,
           educationEntries: eduEntries,
-          currentRole: profile.experience_level ?? '',
+          currentRole: profile.experience_level ?? profile.experienceLevel ?? '',
           location: profile.location ?? '',
           skills: profile.skills ?? '',
           interests: profile.interests ?? '',
           preferredIndustries: prefInd,
           bio: profile.bio ?? '',
-          linkedIn: profile.linked_in_url ?? '',
-          portfolio: profile.portfolio_url ?? '',
+          linkedIn: profile.linked_in_url ?? profile.linkedInUrl ?? '',
+          portfolio: profile.portfolio_url ?? profile.portfolioUrl ?? '',
           gender: profile.gender ?? '',
-          ugCourse: profile.ug_course ?? '',
-          ugSpecialization: profile.ug_specialization ?? '',
-          ugCgpaOrPercentage: profile.ug_cgpa_or_percentage ?? '',
-          hasAdditionalCertifications: profile.has_additional_certifications === true ? 'yes' : profile.has_additional_certifications === false ? 'no' : '',
-          certificateCourseTitles: profile.certificate_course_titles ?? '',
-          isWorking: profile.is_working === true ? 'yes' : profile.is_working === false ? 'no' : '',
-          firstJobTitle: profile.first_job_title ?? '',
-          mastersField: profile.masters_field ?? '',
+          ugCourse: profile.ug_course ?? profile.ugCourse ?? '',
+          ugSpecialization: profile.ug_specialization ?? profile.ugSpecialization ?? '',
+          ugCgpaOrPercentage: profile.ug_cgpa_or_percentage ?? profile.ugCgpaOrPercentage ?? '',
+          hasAdditionalCertifications:
+            (profile.has_additional_certifications ?? profile.hasAdditionalCertifications) === true
+              ? 'yes'
+              : (profile.has_additional_certifications ?? profile.hasAdditionalCertifications) === false
+                ? 'no'
+                : '',
+          certificateCourseTitles: profile.certificate_course_titles ?? profile.certificateCourseTitles ?? '',
+          isWorking:
+            (profile.is_working ?? profile.isWorking) === true
+              ? 'yes'
+              : (profile.is_working ?? profile.isWorking) === false
+                ? 'no'
+                : '',
+          firstJobTitle: profile.first_job_title ?? profile.firstJobTitle ?? '',
+          mastersField: profile.masters_field ?? profile.mastersField ?? '',
         }));
       } catch (err) {
         if (cancelled) return;
@@ -210,27 +220,27 @@ const Profile = () => {
         .filter(s => s.trim())
         .join(';;') || null;
       const payload = {
-        display_name: formData.fullName?.trim() || null,
+        displayName: formData.fullName?.trim() || null,
         education: eduValue,
-        experience_level: formData.currentRole || null,
+        experienceLevel: formData.currentRole || null,
         location: formData.location || null,
         skills: formData.skills || null,
         interests: formData.interests || null,
         bio: formData.bio || null,
-        linked_in_url: formData.linkedIn || null,
-        portfolio_url: formData.portfolio || null,
-        preferred_industries: Array.isArray(formData.preferredIndustries) && formData.preferredIndustries.length > 0
+        linkedInUrl: formData.linkedIn || null,
+        portfolioUrl: formData.portfolio || null,
+        preferredIndustries: Array.isArray(formData.preferredIndustries) && formData.preferredIndustries.length > 0
           ? formData.preferredIndustries.join(',')
           : null,
         gender: formData.gender || null,
-        ug_course: formData.ugCourse || null,
-        ug_specialization: formData.ugSpecialization || null,
-        ug_cgpa_or_percentage: formData.ugCgpaOrPercentage || null,
-        has_additional_certifications: formData.hasAdditionalCertifications === 'yes' ? true : formData.hasAdditionalCertifications === 'no' ? false : null,
-        certificate_course_titles: formData.certificateCourseTitles || null,
-        is_working: formData.isWorking === 'yes' ? true : formData.isWorking === 'no' ? false : null,
-        first_job_title: formData.firstJobTitle || null,
-        masters_field: formData.mastersField || null,
+        ugCourse: formData.ugCourse || null,
+        ugSpecialization: formData.ugSpecialization || null,
+        ugCgpaOrPercentage: formData.ugCgpaOrPercentage || null,
+        hasAdditionalCertifications: formData.hasAdditionalCertifications === 'yes' ? true : formData.hasAdditionalCertifications === 'no' ? false : null,
+        certificateCourseTitles: formData.certificateCourseTitles || null,
+        isWorking: formData.isWorking === 'yes' ? true : formData.isWorking === 'no' ? false : null,
+        firstJobTitle: formData.firstJobTitle || null,
+        mastersField: formData.mastersField || null,
       };
       if (hasExistingProfile) {
         await profileAPI.update(payload);
