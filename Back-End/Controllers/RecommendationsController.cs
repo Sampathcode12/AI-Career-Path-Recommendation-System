@@ -1,11 +1,24 @@
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using BackEnd.Services;
 
 namespace BackEnd.Controllers;
 
-public record ChatRequest(string Message, IReadOnlyList<ChatMessageDto>? ConversationHistory);
+/// <summary>Chat POST body. Accepts camelCase or snake_case for history (frontend variants).</summary>
+public sealed class ChatRequest
+{
+    public string? Message { get; set; }
+
+    public IReadOnlyList<ChatMessageDto>? ConversationHistory { get; set; }
+
+    [JsonPropertyName("conversation_history")]
+    public IReadOnlyList<ChatMessageDto>? ConversationHistorySnake { get; set; }
+
+    public IReadOnlyList<ChatMessageDto> ResolvedHistory =>
+        ConversationHistory ?? ConversationHistorySnake ?? Array.Empty<ChatMessageDto>();
+}
 
 [ApiController]
 [Route("api/recommendations")]
@@ -13,12 +26,10 @@ public record ChatRequest(string Message, IReadOnlyList<ChatMessageDto>? Convers
 public class RecommendationsController : ControllerBase
 {
     private readonly IRecommendationService _recommendationService;
-    private readonly ILogger<RecommendationsController> _logger;
 
-    public RecommendationsController(IRecommendationService recommendationService, ILogger<RecommendationsController> logger)
+    public RecommendationsController(IRecommendationService recommendationService)
     {
         _recommendationService = recommendationService;
-        _logger = logger;
     }
 
     [HttpPost("generate")]
@@ -55,18 +66,9 @@ public class RecommendationsController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized(new { detail = "Please log in again." });
         if (string.IsNullOrWhiteSpace(request?.Message)) return BadRequest(new { detail = "Message is required." });
-        var history = request.ConversationHistory ?? Array.Empty<ChatMessageDto>();
-        try
-        {
-            var response = await _recommendationService.ChatAboutRecommendationsAsync(userId.Value, request.Message, history, ct);
-            var reply = response ?? "The AI chat feature requires an OpenAI API key. Add OpenAI:ApiKey to appsettings.json or user secrets (see docs/OPENAI-SETUP.md). Until then, explore your recommendations above — each career shows skills, salary, growth, and learning paths.";
-            return Ok(new { reply });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Chat request failed");
-            return StatusCode(503, new { detail = "AI service unavailable. Add OpenAI:ApiKey to configuration, or try again later." });
-        }
+        var history = request.ResolvedHistory;
+        var reply = await _recommendationService.ChatAboutRecommendationsAsync(userId.Value, request.Message.Trim(), history, ct);
+        return Ok(new { reply });
     }
 
     private int? GetUserId()

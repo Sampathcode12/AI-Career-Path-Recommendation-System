@@ -26,8 +26,14 @@ public class JobService : IJobService
         }
         if (!string.IsNullOrWhiteSpace(request.Location))
             query = query.Where(j => j.Location != null && j.Location.ToLower().Contains(request.Location.ToLower()));
-        if (!string.IsNullOrWhiteSpace(request.Category) && request.Category != "All")
-            query = query.Where(j => j.Category == request.Category);
+        if (!string.IsNullOrWhiteSpace(request.Category)
+            && !string.Equals(request.Category.Trim(), "All", StringComparison.OrdinalIgnoreCase))
+        {
+            var cat = request.Category.Trim();
+            query = query.Where(j =>
+                j.Category != null
+                && string.Equals(j.Category, cat, StringComparison.OrdinalIgnoreCase));
+        }
         if (!string.IsNullOrWhiteSpace(request.Sector))
             query = query.Where(j => j.Sector != null && j.Sector.ToLower().Contains(request.Sector.ToLower()));
         var list = await query.OrderBy(j => j.Title).Take(100).ToListAsync(ct);
@@ -37,8 +43,14 @@ public class JobService : IJobService
     public async Task<IReadOnlyList<JobListingResponse>> GetTopJobsAsync(string? category, int limit, CancellationToken ct = default)
     {
         var query = _db.JobListings.AsNoTracking();
-        if (!string.IsNullOrWhiteSpace(category) && category != "All")
-            query = query.Where(j => j.Category == category);
+        if (!string.IsNullOrWhiteSpace(category)
+            && !string.Equals(category.Trim(), "All", StringComparison.OrdinalIgnoreCase))
+        {
+            var cat = category.Trim();
+            query = query.Where(j =>
+                j.Category != null
+                && string.Equals(j.Category, cat, StringComparison.OrdinalIgnoreCase));
+        }
         var list = await query.OrderBy(j => j.Title).Take(limit).ToListAsync(ct);
         return list.Select(ToListingResponse).ToList();
     }

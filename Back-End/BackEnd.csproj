@@ -7,6 +7,17 @@
     <RootNamespace>BackEnd</RootNamespace>
   </PropertyGroup>
 
+  <!-- Debug: no native BackEnd.exe shim — avoids MSB3026 when the API is already running (exe locked). dotnet run / VS still host BackEnd.dll. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
+  <!-- Debug: stop the previous API instance so Build can overwrite BackEnd.dll (otherwise .NET Host locks it). Matches launchSettings http profile port 8000. -->
+  <Target Name="FreeBackEndDevServer" BeforeTargets="Build" Condition="'$(Configuration)' == 'Debug' AND $([MSBuild]::IsOSPlatform('Windows'))">
+    <Exec Command="cmd /c taskkill /F /IM BackEnd.exe 2&gt;nul" IgnoreExitCode="true" />
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;$c = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if ($null -ne $c) { Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue }&quot;" IgnoreExitCode="true" />
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />

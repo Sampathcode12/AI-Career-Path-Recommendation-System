@@ -10,11 +10,13 @@ public class RecommendationService : IRecommendationService
 {
     private readonly ApplicationDbContext _db;
     private readonly IOpenAIService _openAI;
+    private readonly ILogger<RecommendationService> _logger;
 
-    public RecommendationService(ApplicationDbContext db, IOpenAIService openAI)
+    public RecommendationService(ApplicationDbContext db, IOpenAIService openAI, ILogger<RecommendationService> logger)
     {
         _db = db;
         _openAI = openAI;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<RecommendationResponse>> GetAllByUserIdAsync(int userId, CancellationToken ct = default)
@@ -27,6 +29,27 @@ public class RecommendationService : IRecommendationService
     }
 
     public async Task<IReadOnlyList<RecommendationResponse>> GenerateAsync(int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await GenerateCoreAsync(userId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "AI recommendation generation failed for user {UserId}; using template careers.", userId);
+            try
+            {
+                return await PersistTemplateRecommendationsAsync(userId, ct);
+            }
+            catch (Exception ex2)
+            {
+                _logger.LogError(ex2, "Could not save template recommendations for user {UserId}; returning in-memory list.", userId);
+                return BuildInMemoryTemplateResponses(userId);
+            }
+        }
+    }
+
+    private async Task<IReadOnlyList<RecommendationResponse>> GenerateCoreAsync(int userId, CancellationToken ct)
     {
         var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
         var profile = await _db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == userId, ct);
@@ -72,17 +95,9 @@ public class RecommendationService : IRecommendationService
         }
         else
         {
-            var samples = new[]
+            for (var i = 0; i < RecommendationTemplateCatalog.Careers.Length; i++)
             {
-                ("Software Developer", "Build applications and systems. Strong fit if you like problem-solving and coding.", "Technology"),
-                ("Data Analyst", "Analyze data to drive decisions. Good fit for analytical and detail-oriented people.", "Data"),
-                ("Product Manager", "Define product vision and work with engineering and design.", "Product"),
-                ("UX Designer", "Design user experiences and interfaces. Ideal for creative and user-focused individuals.", "Design"),
-                ("DevOps Engineer", "Bridge development and operations; focus on CI/CD and cloud infrastructure.", "Technology")
-            };
-            for (var i = 0; i < samples.Length; i++)
-            {
-                var (title, desc, category) = samples[i];
+                var (title, desc, category) = RecommendationTemplateCatalog.Careers[i];
                 _db.CareerRecommendations.Add(new CareerRecommendation
                 {
                     UserId = userId,
@@ -102,6 +117,58 @@ public class RecommendationService : IRecommendationService
             .OrderBy(x => x.SortOrder)
             .ToListAsync(ct);
         return newList.Select(ToResponse).ToList();
+    }
+
+    private async Task<IReadOnlyList<RecommendationResponse>> PersistTemplateRecommendationsAsync(int userId, CancellationToken ct)
+    {
+        var existing = await _db.CareerRecommendations.Where(x => x.UserId == userId).ToListAsync(ct);
+        _db.CareerRecommendations.RemoveRange(existing);
+        await _db.SaveChangesAsync(ct);
+        for (var i = 0; i < RecommendationTemplateCatalog.Careers.Length; i++)
+        {
+            var (title, desc, category) = RecommendationTemplateCatalog.Careers[i];
+            _db.CareerRecommendations.Add(new CareerRecommendation
+            {
+                UserId = userId,
+                Title = title,
+                Description = desc,
+                Category = category,
+                Saved = false,
+                SortOrder = i,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+        await _db.SaveChangesAsync(ct);
+        var newList = await _db.CareerRecommendations.AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync(ct);
+        return newList.Select(ToResponse).ToList();
+    }
+
+    private static IReadOnlyList<RecommendationResponse> BuildInMemoryTemplateResponses(int userId)
+    {
+        var now = DateTime.UtcNow;
+        var list = new List<RecommendationResponse>();
+        for (var i = 0; i < RecommendationTemplateCatalog.Careers.Length; i++)
+        {
+            var (title, desc, category) = RecommendationTemplateCatalog.Careers[i];
+            list.Add(new RecommendationResponse(
+                Id: -(i + 1),
+                UserId: userId,
+                Title: title,
+                Description: desc,
+                Category: category,
+                Saved: false,
+                SortOrder: i,
+                CreatedAt: now,
+                MatchPercentage: 75 + i,
+                SalaryRange: "See market data",
+                Growth: "+10–15%",
+                Skills: new[] { "Communication", "Problem solving", "Domain knowledge" },
+                LearningPath: null));
+        }
+        return list;
     }
 
     private static string BuildProfileSummary(User? user, UserProfile? p)
@@ -130,14 +197,66 @@ public class RecommendationService : IRecommendationService
         return parts.Count > 0 ? string.Join("\n", parts) : "No profile data yet.";
     }
 
-    public async Task<string?> ChatAboutRecommendationsAsync(int userId, string message, IReadOnlyList<ChatMessageDto> conversationHistory, CancellationToken ct = default)
+    public async Task<string> ChatAboutRecommendationsAsync(int userId, string message, IReadOnlyList<ChatMessageDto> conversationHistory, CancellationToken ct = default)
     {
-        var recommendations = await GetAllByUserIdAsync(userId, ct);
-        var context = string.Join("\n", recommendations.Select(r =>
-            $"- {r.Title}: {r.Description} (Category: {r.Category}, Match: {r.MatchPercentage}%, Salary: {r.SalaryRange}, Growth: {r.Growth})"));
-        if (string.IsNullOrWhiteSpace(context)) context = "No recommendations yet. Generate recommendations first.";
-        var history = conversationHistory.Select(h => (object)new { role = h.Role, content = h.Content }).ToList();
-        return await _openAI.ChatAsync(message, history, context, ct);
+        IReadOnlyList<RecommendationResponse> recommendations;
+        try
+        {
+            recommendations = await GetAllByUserIdAsync(userId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Chat: failed to load recommendations for user {UserId}", userId);
+            try
+            {
+                var historyObjects = BuildChatHistoryObjects(conversationHistory);
+                var degradedContext =
+                    "Database unavailable. The app may show built-in sample careers (Software Developer, Data Analyst, Product Manager, UX Designer, DevOps Engineer). Answer using the user's message; focus on any job title they mention.";
+                var aiReply = await _openAI.ChatAsync(message, historyObjects, degradedContext, ct);
+                if (!string.IsNullOrWhiteSpace(aiReply))
+                    return aiReply + "\n\n(Note: SQL Server was not reachable — this reply used AI without your saved list. Fix ConnectionStrings:Default in appsettings, e.g. LocalDB, and restart the API.)";
+            }
+            catch { /* ignore */ }
+
+            return CareerChatFallback.BuildReplyUsingTemplateCatalog(message);
+        }
+
+        try
+        {
+            var context = string.Join("\n", recommendations.Select(r =>
+                $"- {r.Title}: {r.Description} (Category: {r.Category}, Match: {r.MatchPercentage}%, Salary: {r.SalaryRange}, Growth: {r.Growth})"));
+            if (string.IsNullOrWhiteSpace(context)) context = "No recommendations yet. Generate recommendations first.";
+            var historyObjects = BuildChatHistoryObjects(conversationHistory);
+            var aiReply = await _openAI.ChatAsync(message, historyObjects, context, ct);
+            if (!string.IsNullOrWhiteSpace(aiReply)) return aiReply;
+            return CareerChatFallback.BuildReply(message, recommendations);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Chat: unexpected error for user {UserId}", userId);
+            try
+            {
+                return CareerChatFallback.BuildReply(message, recommendations);
+            }
+            catch (Exception ex2)
+            {
+                _logger.LogError(ex2, "Chat: fallback reply failed for user {UserId}", userId);
+                return "Something went wrong while generating a reply. Refresh the page and try again.";
+            }
+        }
+    }
+
+    private static List<object> BuildChatHistoryObjects(IReadOnlyList<ChatMessageDto> conversationHistory)
+    {
+        var list = new List<object>();
+        foreach (var h in conversationHistory)
+        {
+            if (h == null) continue;
+            var role = string.IsNullOrWhiteSpace(h.Role) ? "user" : h.Role.Trim();
+            var content = h.Content ?? "";
+            list.Add(new { role, content });
+        }
+        return list;
     }
 
     public async Task<RecommendationResponse?> UpdateSavedAsync(int userId, int recommendationId, bool saved, CancellationToken ct = default)
