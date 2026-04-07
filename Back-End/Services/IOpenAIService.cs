@@ -6,8 +6,19 @@ public interface IOpenAIService
     /// <summary>True when a non-empty API key is set (or Local provider without requiring a key).</summary>
     bool IsLlmAvailable { get; }
 
+    /// <summary>Configured AI:Provider value (e.g. Gemini, OpenAI, Groq, Local).</summary>
+    string ConfiguredProvider { get; }
+
+    /// <summary>Model id sent to the provider (e.g. gemini-2.0-flash).</summary>
+    string ConfiguredModel { get; }
+
     /// <summary>Generate career recommendations from profile + assessment. Returns null if no LLM is configured or the call fails.</summary>
-    Task<IReadOnlyList<AICareerSuggestion>?> GenerateRecommendationsAsync(string profileSummary, string assessmentSummary, CancellationToken ct = default);
+    /// <param name="surveyMlHint">Optional text from the Colab-trained interest classifier (interests/skills).</param>
+    Task<IReadOnlyList<AICareerSuggestion>?> GenerateRecommendationsAsync(
+        string profileSummary,
+        string assessmentSummary,
+        CancellationToken ct = default,
+        string? surveyMlHint = null);
 
     /// <summary>Continue conversation about recommendations. Returns null if no LLM is configured or the call fails.</summary>
     Task<string?> ChatAsync(string userMessage, IReadOnlyList<object> conversationHistory, string recommendationsContext, CancellationToken ct = default);

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using BackEnd.Models;
 
 namespace BackEnd.Data;
@@ -30,7 +31,7 @@ public static class DataSeeder
         new IndustrySkillGap { IndustryId = "aerospace", Name = "Aerospace & Defense", Description = "Aircraft, spacecraft, defense systems, and aviation.", DemandGrowth = "+5%", TopDemandSkillsJson = "[\"Systems Engineering\",\"CAD/CAM\",\"Compliance\",\"Project Management\",\"Quality Assurance\"]", GapSkillsJson = "[\"Additive Manufacturing\",\"Autonomous Systems\",\"Cybersecurity\"]", SupplyLevel = "Low", TopRegionsJson = "[\"USA\",\"EU\",\"UK\",\"Japan\",\"India\",\"Israel\"]", TypicalSalaryRange = "$65k – $150k", TypicalEducation = "Bachelor's in Aerospace, Mechanical, or Electrical Engineering", TypicalCertifications = "PMP, Six Sigma" },
     };
 
-    public static async Task SeedAsync(ApplicationDbContext db, CancellationToken ct = default)
+    public static async Task SeedAsync(ApplicationDbContext db, IHostEnvironment? env = null, CancellationToken ct = default)
     {
         var existingIds = await db.IndustrySkillGaps.Select(x => x.IndustryId).ToListAsync(ct);
         var toAdd = GetAllIndustries().Where(g => !existingIds.Contains(g.IndustryId)).ToArray();
@@ -67,5 +68,22 @@ public static class DataSeeder
         }
 
         await db.SaveChangesAsync(ct);
+
+        // Development-only demo account so login can be verified on a fresh database
+        if (env?.IsDevelopment() == true)
+        {
+            const string demoEmail = "demo@careerpath.local";
+            if (!await db.Users.AnyAsync(u => u.Email == demoEmail, ct))
+            {
+                db.Users.Add(new User
+                {
+                    Name = "Demo User",
+                    Email = demoEmail,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Demo123!"),
+                    CreatedAt = DateTime.UtcNow,
+                });
+                await db.SaveChangesAsync(ct);
+            }
+        }
     }
 }

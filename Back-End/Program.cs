@@ -17,6 +17,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddControllers().AddJsonOptions(o =>
 {
     o.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
 });
 
 // DbContext: connection string "Default" (or "DefaultConnection"). On run, DB is created/updated via migrations.
@@ -61,6 +62,10 @@ builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<IMarketTrendsService, MarketTrendsService>();
 builder.Services.AddScoped<ISkillGapService, SkillGapService>();
+
+builder.Services.Configure<MlSettings>(builder.Configuration.GetSection("ML"));
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IMlInterestPredictService, MlInterestPredictService>();
 
 // CORS
 builder.Services.AddCors(options =>

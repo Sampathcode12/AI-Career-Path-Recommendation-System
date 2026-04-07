@@ -22,13 +22,19 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponse> SignUpAsync(SignUpRequest request, CancellationToken ct = default)
     {
-        if (await _db.Users.AnyAsync(u => u.Email == request.Email, ct))
+        var email = request.Email?.Trim() ?? "";
+        if (string.IsNullOrEmpty(email))
+            throw new ArgumentException("Email is required.");
+        var emailLower = email.ToLowerInvariant();
+        if (await _db.Users.AnyAsync(u => u.Email != null && u.Email.ToLower() == emailLower, ct))
             throw new ArgumentException("Email already registered.");
+        if (string.IsNullOrEmpty(request.Password))
+            throw new ArgumentException("Password is required.");
 
         var user = new User
         {
-            Name = request.Name,
-            Email = request.Email,
+            Name = request.Name?.Trim() ?? "",
+            Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             CreatedAt = DateTime.UtcNow
         };
@@ -46,12 +52,24 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponse?> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email, ct);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        var email = request.Email?.Trim();
+        var password = request.Password;
+        if (string.IsNullOrEmpty(email) || password is null)
+            return null;
+
+        // Case-insensitive match (handles different DB casing / typos in email case)
+        var emailLower = email.ToLowerInvariant();
+        var user = await _db.Users.FirstOrDefaultAsync(
+            u => u.Email != null && u.Email.ToLower() == emailLower,
+            ct);
+        if (user == null || string.IsNullOrEmpty(user.PasswordHash))
+            return null;
+
+        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
             return null;
 
         // Save sign-in details (aligned with frontend login: email + timestamp)
-        _db.UserSignInDetails.Add(new UserSignInDetail { UserId = user.Id, Email = request.Email, SignedInAt = DateTime.UtcNow });
+        _db.UserSignInDetails.Add(new UserSignInDetail { UserId = user.Id, Email = user.Email, SignedInAt = DateTime.UtcNow });
         await _db.SaveChangesAsync(ct);
 
         var userResponse = new UserResponse(user.Id, user.Name, user.Email);

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using BackEnd.DTOs;
 using BackEnd.Services;
 
 namespace BackEnd.Controllers;
@@ -26,10 +27,23 @@ public sealed class ChatRequest
 public class RecommendationsController : ControllerBase
 {
     private readonly IRecommendationService _recommendationService;
+    private readonly IOpenAIService _openAI;
 
-    public RecommendationsController(IRecommendationService recommendationService)
+    public RecommendationsController(IRecommendationService recommendationService, IOpenAIService openAI)
     {
         _recommendationService = recommendationService;
+        _openAI = openAI;
+    }
+
+    /// <summary>Whether an API key (or Local) is configured so Gemini/ChatGPT/etc. can run — does not expose keys.</summary>
+    [HttpGet("ai-setup-status")]
+    public IActionResult GetAiSetupStatus()
+    {
+        if (GetUserId() == null) return Unauthorized();
+        return Ok(new AiSetupStatusResponse(
+            _openAI.IsLlmAvailable,
+            _openAI.ConfiguredProvider,
+            _openAI.ConfiguredModel));
     }
 
     [HttpPost("generate")]
