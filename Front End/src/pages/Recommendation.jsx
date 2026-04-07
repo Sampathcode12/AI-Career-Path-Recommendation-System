@@ -53,6 +53,23 @@ const mapApiToCareer = (r) => ({
   saved: r.saved ?? false,
 });
 
+const API_BASE_HINT = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
+/** POST /generate returns { recommendations, generation_source } or (legacy) a bare array. */
+function parseGenerateResponse(data) {
+  if (Array.isArray(data)) {
+    return { rows: data, generationSource: null };
+  }
+  if (data && typeof data === 'object') {
+    const rows =
+      data.recommendations ?? data.Recommendations ?? data.items ?? data.Items ?? [];
+    const generationSource =
+      data.generation_source ?? data.generationSource ?? data.GenerationSource ?? null;
+    return { rows: Array.isArray(rows) ? rows : [], generationSource };
+  }
+  return { rows: [], generationSource: null };
+}
+
 const SAMPLE_RECOMMENDATIONS = [
   { id: 1, title: 'Data Scientist', match: 87, salary: '$95,000 - $140,000', growth: '+18%', description: 'Analyze complex data to help organizations make data-driven decisions.', skills: ['Python', 'Machine Learning', 'Statistics', 'Data Visualization'], requirements: { education: "Bachelor's in Computer Science, Data Science, or related", experience: '2-5 years', certifications: [] }, learningPath: [{ step: 1, title: 'Learn Python Fundamentals', duration: '2-3 months' }, { step: 2, title: 'Master Data Analysis Tools', duration: '1-2 months' }, { step: 3, title: 'Study Machine Learning', duration: '3-4 months' }, { step: 4, title: 'Build Portfolio Projects', duration: '2-3 months' }], saved: false },
   { id: 2, title: 'Software Engineer', match: 82, salary: '$85,000 - $130,000', growth: '+15%', description: 'Design, develop, and maintain software applications and systems.', skills: ['JavaScript', 'React', 'Node.js', 'System Design'], requirements: { education: "Bachelor's in Computer Science or Software Engineering", experience: '1-4 years', certifications: [] }, learningPath: [{ step: 1, title: 'Learn Programming Fundamentals', duration: '3-4 months' }, { step: 2, title: 'Master Web Technologies', duration: '2-3 months' }, { step: 3, title: 'Learn Software Architecture', duration: '2-3 months' }, { step: 4, title: 'Build Real Projects', duration: '3-4 months' }], saved: false },
@@ -74,14 +91,58 @@ const Recommendation = () => {
   const [pendingAskCareer, setPendingAskCareer] = useState(null);
   /** True when API failed or UI is showing sample / offline template rows. */
   const [usingTemplateRecommendations, setUsingTemplateRecommendations] = useState(false);
+  /** From last generate: ai | template_no_key | template_llm_failed | template_error | offline | null */
+  const [generationSource, setGenerationSource] = useState(null);
+  /** From GET /recommendations/ai-setup-status — tells us if Gemini/OpenAI key is configured on the server. */
+  const [aiSetupStatus, setAiSetupStatus] = useState(null);
+  const [aiSetupLoaded, setAiSetupLoaded] = useState(false);
 
-  const applyRecommendationList = useCallback((rawList, fromApiError) => {
-    const genList = Array.isArray(rawList) ? rawList.map(mapApiToCareer) : [];
+  const refreshAiSetupStatus = useCallback(async () => {
+    try {
+      const setup = await recommendationsAPI.getAiSetupStatus();
+      setAiSetupStatus({
+        llmConfigured: Boolean(setup.llm_configured ?? setup.llmConfigured),
+        provider: setup.provider ?? '',
+        model: setup.model ?? '',
+      });
+    } catch {
+      setAiSetupStatus(null);
+    } finally {
+      setAiSetupLoaded(true);
+    }
+  }, []);
+
+  const applyRecommendationList = useCallback((payload, options = {}) => {
+    const fromApiError = options.fromApiError === true;
+    let rows;
+    let source;
+
+    if (fromApiError) {
+      rows = [];
+      source = 'offline';
+    } else if (Array.isArray(payload)) {
+      rows = payload;
+      source = options.generationSource ?? null;
+    } else {
+      const parsed = parseGenerateResponse(payload);
+      rows = parsed.rows;
+      source = parsed.generationSource ?? options.generationSource ?? null;
+    }
+
+    const genList = rows.map(mapApiToCareer);
     const list =
       genList.length > 0
         ? genList
         : SAMPLE_RECOMMENDATIONS.map((c, i) => ({ ...c, id: -(i + 1) }));
-    setUsingTemplateRecommendations(Boolean(fromApiError || list.some((c) => c.id < 0)));
+
+    const isOfflineSample = list.some((c) => c.id < 0);
+    const isNonAiGenerate =
+      source === 'template_no_key' ||
+      source === 'template_llm_failed' ||
+      source === 'template_error';
+
+    setGenerationSource(source);
+    setUsingTemplateRecommendations(Boolean(fromApiError || isOfflineSample || isNonAiGenerate));
     setCareers(list);
   }, []);
 
@@ -90,27 +151,33 @@ const Recommendation = () => {
     async function init() {
       setLoading(true);
       setUsingTemplateRecommendations(false);
+      setGenerationSource(null);
+      setAiSetupLoaded(false);
       try {
+        await refreshAiSetupStatus();
+        if (cancelled) return;
+
         if (regenerateOnLoad) {
           const gen = await recommendationsAPI.generate();
-          if (!cancelled) applyRecommendationList(gen, false);
+          if (!cancelled) applyRecommendationList(gen);
         } else {
           const data = await recommendationsAPI.getAll();
           const list = Array.isArray(data) ? data.map(mapApiToCareer) : [];
           if (cancelled) return;
           if (list.length > 0) {
             setCareers(list);
+            setGenerationSource(null);
             setUsingTemplateRecommendations(list.some((c) => c.id < 0));
           } else {
             const gen = await recommendationsAPI.generate();
             if (cancelled) return;
-            applyRecommendationList(gen, false);
+            applyRecommendationList(gen);
           }
         }
       } catch (err) {
         if (!cancelled) {
           console.error(err);
-          applyRecommendationList([], true);
+          applyRecommendationList([], { fromApiError: true });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -118,17 +185,19 @@ const Recommendation = () => {
     }
     init();
     return () => { cancelled = true; };
-  }, [regenerateOnLoad, applyRecommendationList]);
+  }, [regenerateOnLoad, applyRecommendationList, refreshAiSetupStatus]);
 
   const handleGenerate = async () => {
     setGenerating(true);
     setChatHistory([]);
     try {
       const data = await recommendationsAPI.generate();
-      applyRecommendationList(data, false);
+      applyRecommendationList(data);
+      await refreshAiSetupStatus();
     } catch (err) {
       console.error(err);
-      applyRecommendationList([], true);
+      applyRecommendationList([], { fromApiError: true });
+      await refreshAiSetupStatus();
     } finally {
       setGenerating(false);
     }
@@ -152,27 +221,33 @@ const Recommendation = () => {
   };
 
   useEffect(() => {
-    if (pendingAskCareer && chatOpen && !chatLoading) {
-      const title = pendingAskCareer;
-      setPendingAskCareer(null);
+    if (!pendingAskCareer || !chatOpen || chatLoading) return;
+    const title = pendingAskCareer;
+    setPendingAskCareer(null);
+    // Defer until after chat panel paints so the UI is open before the request runs
+    const t = window.setTimeout(() => {
       handleChatSend(`Tell me more about ${title}`);
-    }
+    }, 0);
+    return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAskCareer, chatOpen, chatLoading]);
 
   const handleChatSend = async (msg) => {
     const message = (typeof msg === 'string' ? msg : '').trim();
     if (!message || chatLoading) return;
-    const userEntry = { role: 'user', content: message };
-    setChatHistory((h) => [...h, userEntry]);
+    // Snapshot prior turns inside the state updater so history is never stale (multi-turn like ChatGPT/Gemini)
+    let historySnapshot = [];
+    setChatHistory((h) => {
+      historySnapshot = h.map((m) => ({ role: m.role, content: m.content }));
+      return [...h, { role: 'user', content: message }];
+    });
     setChatLoading(true);
     try {
-      const historyForApi = chatHistory.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-      const res = await recommendationsAPI.chat(message, historyForApi);
-      const reply = res?.reply ?? 'Sorry, I could not get a response. Try again in a moment.';
+      const res = await recommendationsAPI.chat(message, historySnapshot);
+      const reply =
+        (typeof res?.reply === 'string' && res.reply) ||
+        (typeof res?.data?.reply === 'string' && res.data.reply) ||
+        'Sorry, I could not get a response. Try again in a moment.';
       setChatHistory((h) => [...h, { role: 'assistant', content: reply }]);
     } catch (err) {
       console.error(err);
@@ -253,16 +328,66 @@ const Recommendation = () => {
     },
   };
 
+  const showConnectAiPanel =
+    aiSetupLoaded && aiSetupStatus && !aiSetupStatus.llmConfigured;
+
+  const showOrangeTemplateBanner =
+    usingTemplateRecommendations &&
+    !loading &&
+    !(generationSource === 'template_no_key' && showConnectAiPanel);
+
   return (
     <section className="page-section">
       <div className="card">
         <h2>AI-Based Career Recommendation</h2>
         <p className="page-lede" style={{ marginBottom: '1.25rem' }}>
-          Recommendations use your saved profile and skill assessment. Update your career background anytime on the{' '}
-          <Link to="/career-survey">career survey</Link> page, then generate or regenerate below.
+          Recommendations use your saved <Link to="/career-survey">career survey</Link> (interests, skills, UG fields) and
+          skill assessment. When the survey ML service is running (<code style={{ fontSize: '0.85em' }}>ml/predict_api.py</code>
+          + <code style={{ fontSize: '0.85em' }}>ML:PythonPredictBaseUrl</code>), generate/regenerate also uses that model to
+          steer career paths; with a configured Gemini/OpenAI key, the list is AI-ranked using both.
         </p>
 
-        {usingTemplateRecommendations && !loading && (
+        {showConnectAiPanel && (
+          <div
+            role="status"
+            style={{
+              marginBottom: '1.25rem',
+              padding: '0.85rem 1rem',
+              background: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid rgba(59, 130, 246, 0.35)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.9rem',
+              color: 'var(--text)',
+            }}
+          >
+            <strong>Turn on the built-in AI (Gemini / ChatGPT / Groq / Ollama):</strong> your backend is set to{' '}
+            <code style={{ fontSize: '0.85em' }}>{aiSetupStatus.provider || 'Gemini'}</code>
+            {aiSetupStatus.model ? (
+              <>
+                {' '}
+                with model <code style={{ fontSize: '0.85em' }}>{aiSetupStatus.model}</code>
+              </>
+            ) : null}
+            , but <strong>no API key is loaded</strong>, so the app cannot call Google or OpenAI yet — you only see generic
+            template careers until a key is set.
+            <br />
+            <span style={{ display: 'block', marginTop: '0.5rem' }}>
+              <strong>Free Gemini (easiest):</strong>{' '}
+              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
+                create a key in Google AI Studio
+              </a>
+              , then put it in <code style={{ fontSize: '0.85em' }}>Back-End/appsettings.json</code> →{' '}
+              <code style={{ fontSize: '0.85em' }}>AI:Gemini:ApiKey</code>, or set env{' '}
+              <code style={{ fontSize: '0.85em' }}>GEMINI_API_KEY</code>, or{' '}
+              <code style={{ fontSize: '0.85em' }}>dotnet user-secrets set &quot;AI:Gemini:ApiKey&quot; &quot;…&quot;</code>{' '}
+              in the Back-End folder. For OpenAI or Groq, set <code style={{ fontSize: '0.85em' }}>AI:Provider</code> and
+              the matching key (see <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>). Restart the API, then
+              click <strong>Regenerate</strong>.
+            </span>
+          </div>
+        )}
+
+        {showOrangeTemplateBanner && (
           <p
             role="status"
             style={{
@@ -275,12 +400,43 @@ const Recommendation = () => {
               color: 'var(--text)',
             }}
           >
-            <strong>Demo / fallback:</strong> These careers are template examples (not from your AI model) because the
-            generate request could not reach an AI provider. Add a free{' '}
-            <strong>Gemini API key</strong> (or Groq / OpenAI / Ollama) in{' '}
-            <code style={{ fontSize: '0.85em' }}>appsettings.json → AI</code> — see{' '}
-            <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>
-            — then click Regenerate.
+            {generationSource === 'template_no_key' && (
+              <>
+                <strong>Not AI-personalized yet:</strong> No API key is configured on the server. Use the blue box above
+                (if visible) or see <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>, restart the API, then{' '}
+                <strong>Regenerate</strong>.
+              </>
+            )}
+            {generationSource === 'template_llm_failed' && (
+              <>
+                <strong>AI call failed:</strong> A key may be set, but the provider did not return usable recommendations
+                (wrong model name, quota, network, or invalid JSON). Check the API console, try{' '}
+                <code style={{ fontSize: '0.85em' }}>gemini-2.0-flash</code> in appsettings, and restart the backend. Showing
+                template careers until generation succeeds — click <strong>Regenerate</strong> after fixing.
+              </>
+            )}
+            {generationSource === 'offline' && (
+              <>
+                <strong>Could not reach the API:</strong> the browser request failed (backend not running, wrong URL, or
+                session expired). Confirm the API is up at <code style={{ fontSize: '0.85em' }}>{API_BASE_HINT}</code>,
+                check <code style={{ fontSize: '0.85em' }}>VITE_API_BASE_URL</code> in the front end, and log in again if
+                you see 401 errors. After the connection works, add a Gemini/OpenAI key (see{' '}
+                <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>) and click <strong>Regenerate</strong>.
+              </>
+            )}
+            {generationSource === 'template_error' && (
+              <>
+                <strong>Server error while saving recommendations:</strong> check backend logs and SQL connection. After
+                fixing, click <strong>Regenerate</strong>. For personalized careers you still need an AI API key — see{' '}
+                <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>.
+              </>
+            )}
+            {(generationSource === null || generationSource === undefined) && (
+              <>
+                <strong>Demo / sample data:</strong> you are seeing local example careers (not from your profile). Use{' '}
+                <strong>Regenerate</strong> after the API is connected, or configure an AI key as in the blue box above.
+              </>
+            )}
           </p>
         )}
 
@@ -302,7 +458,7 @@ const Recommendation = () => {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => applyRecommendationList([], true)}
+              onClick={() => applyRecommendationList([], { fromApiError: true })}
               style={{ marginTop: '0.5rem' }}
             >
               Show Sample Recommendations
@@ -541,12 +697,15 @@ const Recommendation = () => {
       {careers.length > 0 && (
         <RecommendationChatbot
           onSend={handleChatSend}
+          onNewChat={() => {
+            if (!chatLoading) setChatHistory([]);
+          }}
           chatHistory={chatHistory}
           chatLoading={chatLoading}
           disabled={false}
           open={chatOpen}
           onOpenChange={setChatOpen}
-          showFloatingButton={false}
+          showFloatingButton={true}
         />
       )}
 

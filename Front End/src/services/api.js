@@ -81,6 +81,8 @@ export const assessmentAPI = {
 
 // Recommendations API
 export const recommendationsAPI = {
+  /** Whether backend has an API key (or Local) so Gemini/ChatGPT/etc. can run — no secrets returned. */
+  getAiSetupStatus: () => apiCall('/recommendations/ai-setup-status'),
   generate: () => apiCall('/recommendations/generate', {
     method: 'POST',
   }),
@@ -114,6 +116,22 @@ export const jobsAPI = {
     method: 'POST',
     body: jobData,
   }),
+};
+
+// Colab-trained interest model (Python FastAPI) — proxied through .NET; see ml/HOWTO-USE-MODEL.md
+export const mlAPI = {
+  predictInterest: (body) =>
+    apiCall('/ml/predict-interest', {
+      method: 'POST',
+      body: {
+        interests: body.interests ?? '',
+        skills: body.skills ?? '',
+        certificateCourseTitle: body.certificateCourseTitle ?? body.certificate_course_title ?? '',
+        ugCourse: body.ugCourse ?? body.ug_course ?? '',
+        ugSpecialization: body.ugSpecialization ?? body.ug_specialization ?? '',
+        topK: body.topK ?? body.top_k ?? 3,
+      },
+    }),
 };
 
 // Skill Gap API

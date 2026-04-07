@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using BackEnd.Data;
@@ -10,12 +11,18 @@ public class RecommendationService : IRecommendationService
 {
     private readonly ApplicationDbContext _db;
     private readonly IOpenAIService _openAI;
+    private readonly IMlInterestPredictService _mlSurvey;
     private readonly ILogger<RecommendationService> _logger;
 
-    public RecommendationService(ApplicationDbContext db, IOpenAIService openAI, ILogger<RecommendationService> logger)
+    public RecommendationService(
+        ApplicationDbContext db,
+        IOpenAIService openAI,
+        IMlInterestPredictService mlSurvey,
+        ILogger<RecommendationService> logger)
     {
         _db = db;
         _openAI = openAI;
+        _mlSurvey = mlSurvey;
         _logger = logger;
     }
 
@@ -62,7 +69,12 @@ public class RecommendationService : IRecommendationService
         var profileSummary = BuildProfileSummary(user, profile);
         var assessmentSummary = assessment?.ResultSummary ?? assessment?.AnswersJson ?? "No assessment data yet.";
 
-        var aiSuggestions = await _openAI.GenerateRecommendationsAsync(profileSummary, assessmentSummary, ct);
+        var mlSignal = await GetMlSurveySignalAsync(profile, ct);
+        var aiSuggestions = await _openAI.GenerateRecommendationsAsync(
+            profileSummary,
+            assessmentSummary,
+            ct,
+            mlSignal?.PromptHint);
 
         var generationSource = aiSuggestions is { Count: > 0 }
             ? "ai"
@@ -107,9 +119,10 @@ public class RecommendationService : IRecommendationService
         }
         else
         {
-            for (var i = 0; i < RecommendationTemplateCatalog.Careers.Length; i++)
+            var orderedTemplates = OrderTemplatesForMlCategory(mlSignal?.PrimaryCategory);
+            for (var i = 0; i < orderedTemplates.Count; i++)
             {
-                var (title, desc, category) = RecommendationTemplateCatalog.Careers[i];
+                var (title, desc, category) = orderedTemplates[i];
                 _db.CareerRecommendations.Add(new CareerRecommendation
                 {
                     UserId = userId,
@@ -208,6 +221,87 @@ public class RecommendationService : IRecommendationService
         if (!string.IsNullOrWhiteSpace(p.Location)) parts.Add($"Location: {p.Location}");
         if (!string.IsNullOrWhiteSpace(p.Bio)) parts.Add($"Bio: {p.Bio}");
         return parts.Count > 0 ? string.Join("\n", parts) : "No profile data yet.";
+    }
+
+    private sealed record MlSurveySignal(string PromptHint, string PrimaryCategory);
+
+    /// <summary>Calls the Colab-trained Python model with the same fields as the career survey UI.</summary>
+    private async Task<MlSurveySignal?> GetMlSurveySignalAsync(UserProfile? profile, CancellationToken ct)
+    {
+        if (profile == null) return null;
+        var interests = profile.Interests?.Trim() ?? "";
+        var skills = profile.Skills?.Trim() ?? "";
+        if (interests.Length == 0 && skills.Length == 0) return null;
+
+        try
+        {
+            var r = await _mlSurvey.PredictInterestAsync(
+                interests,
+                skills,
+                profile.CertificateCourseTitles ?? "",
+                profile.UgCourse ?? "",
+                profile.UgSpecialization ?? "",
+                3,
+                ct);
+
+            if (!r.Available || string.IsNullOrWhiteSpace(r.PredictedCategory)) return null;
+
+            var sb = new StringBuilder();
+            sb.Append("Primary predicted interest cluster: ").Append(r.PredictedCategory).Append('.');
+            if (r.TopPredictions is { Count: > 0 })
+            {
+                sb.Append(" Top alternatives: ");
+                sb.Append(string.Join("; ", r.TopPredictions.Select(t => $"{t.Label} ({t.Probability:P0})")));
+            }
+
+            _logger.LogInformation(
+                "Survey ML signal for recommendations: {Category}",
+                r.PredictedCategory);
+
+            return new MlSurveySignal(sb.ToString(), r.PredictedCategory.Trim());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Survey ML call skipped for recommendations.");
+            return null;
+        }
+    }
+
+    /// <summary>Put careers most aligned with the ML interest cluster first when the LLM is unavailable.</summary>
+    private static List<(string Title, string Desc, string Category)> OrderTemplatesForMlCategory(string? mlCategory)
+    {
+        var list = RecommendationTemplateCatalog.Careers.ToList();
+        if (string.IsNullOrWhiteSpace(mlCategory)) return list;
+
+        var c = mlCategory.Trim().ToLowerInvariant().Replace(' ', '_').Replace('-', '_');
+
+        int Score(string title)
+        {
+            var t = title.ToLowerInvariant();
+            return c switch
+            {
+                "data_science" => t.Contains("data scientist", StringComparison.Ordinal) ? 0
+                    : t.Contains("data analyst", StringComparison.Ordinal) ? 1
+                    : t.Contains("software", StringComparison.Ordinal) ? 4
+                    : 8,
+                "technology" => t.Contains("software", StringComparison.Ordinal) || t.Contains("devops", StringComparison.Ordinal) ? 0
+                    : t.Contains("data", StringComparison.Ordinal) ? 2
+                    : 8,
+                "marketing" => t.Contains("product", StringComparison.Ordinal) ? 0
+                    : t.Contains("ux", StringComparison.Ordinal) ? 1
+                    : 8,
+                "finance" => t.Contains("analyst", StringComparison.Ordinal) ? 0
+                    : t.Contains("data", StringComparison.Ordinal) ? 1
+                    : 8,
+                "teaching" => t.Contains("ux", StringComparison.Ordinal) ? 0
+                    : t.Contains("product", StringComparison.Ordinal) ? 1
+                    : 8,
+                "other" => 5,
+                _ => 5
+            };
+        }
+
+        return list.OrderBy(x => Score(x.Title)).ThenBy(x => x.Title, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     public async Task<string> ChatAboutRecommendationsAsync(int userId, string message, IReadOnlyList<ChatMessageDto> conversationHistory, CancellationToken ct = default)

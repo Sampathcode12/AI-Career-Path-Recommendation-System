@@ -26,6 +26,10 @@ public class OpenAIService : IOpenAIService
 
     public bool IsLlmAvailable => _llmAvailable;
 
+    public string ConfiguredProvider => _provider;
+
+    public string ConfiguredModel => _model;
+
     public OpenAIService(HttpClient http, IConfiguration config)
     {
         _http = http;
@@ -75,12 +79,23 @@ public class OpenAIService : IOpenAIService
     }
 
     public async Task<IReadOnlyList<AICareerSuggestion>?> GenerateRecommendationsAsync(
-        string profileSummary, string assessmentSummary, CancellationToken ct = default)
+        string profileSummary,
+        string assessmentSummary,
+        CancellationToken ct = default,
+        string? surveyMlHint = null)
     {
         if (!_llmAvailable) return null;
 
-        var prompt = $@"You are a career advisor. Given the profile and assessment below, suggest 5-7 careers that specifically fit THIS person — use their education, skills, interests, location, and assessment answers. Do not output a generic unrelated list; tie each role to evidence from the profile/assessment in the description.
+        var mlBlock = string.IsNullOrWhiteSpace(surveyMlHint)
+            ? ""
+            : $"""
 
+Survey-trained interest classifier (from the same kind of interests/skills text as your training data — prioritize careers consistent with this signal when it matches the rest of the profile):
+{surveyMlHint.Trim()}
+""";
+
+        var prompt = $@"You are a career advisor. Given the profile and assessment below, suggest 5-7 careers that specifically fit THIS person — use their education, skills, interests, location, and assessment answers. Do not output a generic unrelated list; tie each role to evidence from the profile/assessment in the description. If a survey ML hint is included below, weight suggested careers toward those clusters when they align with the user's stated interests and skills.
+{mlBlock}
 Profile:
 {profileSummary}
 
