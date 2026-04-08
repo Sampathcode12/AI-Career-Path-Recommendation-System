@@ -31,7 +31,8 @@ if (!string.IsNullOrWhiteSpace(databaseName))
     connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Database=[^;]*", "Database=" + databaseName, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 }
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlServer(connectionString, sql =>
+        sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(3), null)));
 
 // JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "your-256-bit-secret-key-for-signing-tokens!!";
@@ -66,6 +67,7 @@ builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 builder.Services.Configure<MlSettings>(builder.Configuration.GetSection("ML"));
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IMlInterestPredictService, MlInterestPredictService>();
+builder.Services.AddHostedService<FlaskMlAutoStartHostedService>();
 
 // CORS
 builder.Services.AddCors(options =>

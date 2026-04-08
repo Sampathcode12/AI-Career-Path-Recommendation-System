@@ -70,13 +70,21 @@ public class RecommendationService : IRecommendationService
         var assessmentSummary = assessment?.ResultSummary ?? assessment?.AnswersJson ?? "No assessment data yet.";
 
         var mlSignal = await GetMlSurveySignalAsync(profile, ct);
-        var aiSuggestions = await _openAI.GenerateRecommendationsAsync(
+        var aiRaw = await _openAI.GenerateRecommendationsAsync(
             profileSummary,
             assessmentSummary,
             ct,
             mlSignal?.PromptHint);
 
-        var generationSource = aiSuggestions is { Count: > 0 }
+        var validAi = aiRaw?
+            .Where(s => s != null && !string.IsNullOrWhiteSpace(s.Title))
+            .ToList();
+
+        if (aiRaw is { Count: > 0 } && (validAi == null || validAi.Count == 0))
+            _logger.LogWarning("Career generate for user {UserId}: LLM returned entries with no usable titles; using templates.", userId);
+
+        var useAi = validAi is { Count: > 0 };
+        var generationSource = useAi
             ? "ai"
             : !_openAI.IsLlmAvailable
                 ? "template_no_key"
@@ -89,52 +97,80 @@ public class RecommendationService : IRecommendationService
 
         var existing = await _db.CareerRecommendations.Where(x => x.UserId == userId).ToListAsync(ct);
         _db.CareerRecommendations.RemoveRange(existing);
-        await _db.SaveChangesAsync(ct);
 
-        if (aiSuggestions != null && aiSuggestions.Count > 0)
+        if (useAi)
         {
-            for (var i = 0; i < aiSuggestions.Count; i++)
+            for (var i = 0; i < validAi!.Count; i++)
             {
-                var s = aiSuggestions[i];
-                var meta = new
+                var s = validAi[i];
+                string? metaJson;
+                try
                 {
-                    matchPercentage = s.MatchPercentage,
-                    salaryRange = s.SalaryRange,
-                    growth = s.Growth,
-                    skills = s.Skills,
-                    learningPath = s.LearningPath?.Select(lp => new { lp.Step, lp.Title, lp.Duration }).ToList()
-                };
+                    var meta = new
+                    {
+                        matchPercentage = s.MatchPercentage,
+                        salaryRange = s.SalaryRange,
+                        growth = s.Growth,
+                        skills = s.Skills,
+                        learningPath = s.LearningPath?.Select(lp => new { lp.Step, lp.Title, lp.Duration }).ToList(),
+                    };
+                    metaJson = JsonSerializer.Serialize(meta);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not serialize metadata for AI career row; saving without metadata.");
+                    metaJson = null;
+                }
+
                 _db.CareerRecommendations.Add(new CareerRecommendation
                 {
                     UserId = userId,
-                    Title = s.Title,
-                    Description = s.Description,
-                    Category = s.Category,
+                    Title = s.Title.Trim(),
+                    Description = string.IsNullOrWhiteSpace(s.Description) ? null : s.Description.Trim(),
+                    Category = string.IsNullOrWhiteSpace(s.Category) ? null : s.Category.Trim(),
                     Saved = false,
                     SortOrder = i,
                     CreatedAt = DateTime.UtcNow,
-                    MetadataJson = JsonSerializer.Serialize(meta)
+                    MetadataJson = metaJson,
                 });
             }
         }
         else
         {
-            var orderedTemplates = OrderTemplatesForMlCategory(mlSignal?.PrimaryCategory);
-            for (var i = 0; i < orderedTemplates.Count; i++)
+            var templateRows = BuildMlGuidedTemplateRows(mlSignal);
+            for (var i = 0; i < templateRows.Count; i++)
             {
-                var (title, desc, category) = orderedTemplates[i];
+                var row = templateRows[i];
+                string? metaJson;
+                try
+                {
+                    metaJson = JsonSerializer.Serialize(new
+                    {
+                        matchPercentage = row.Match,
+                        salaryRange = row.Salary,
+                        growth = row.Growth,
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not serialize template metadata; saving without metadata.");
+                    metaJson = null;
+                }
+
                 _db.CareerRecommendations.Add(new CareerRecommendation
                 {
                     UserId = userId,
-                    Title = title,
-                    Description = desc,
-                    Category = category,
+                    Title = row.Title,
+                    Description = row.Desc,
+                    Category = row.Category,
                     Saved = false,
                     SortOrder = i,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    MetadataJson = metaJson,
                 });
             }
         }
+
         await _db.SaveChangesAsync(ct);
 
         var newList = await _db.CareerRecommendations.AsNoTracking()
@@ -149,7 +185,6 @@ public class RecommendationService : IRecommendationService
     {
         var existing = await _db.CareerRecommendations.Where(x => x.UserId == userId).ToListAsync(ct);
         _db.CareerRecommendations.RemoveRange(existing);
-        await _db.SaveChangesAsync(ct);
         for (var i = 0; i < RecommendationTemplateCatalog.Careers.Length; i++)
         {
             var (title, desc, category) = RecommendationTemplateCatalog.Careers[i];
@@ -164,6 +199,7 @@ public class RecommendationService : IRecommendationService
                 CreatedAt = DateTime.UtcNow
             });
         }
+
         await _db.SaveChangesAsync(ct);
         var newList = await _db.CareerRecommendations.AsNoTracking()
             .Where(x => x.UserId == userId)
@@ -223,15 +259,54 @@ public class RecommendationService : IRecommendationService
         return parts.Count > 0 ? string.Join("\n", parts) : "No profile data yet.";
     }
 
-    private sealed record MlSurveySignal(string PromptHint, string PrimaryCategory);
+    private sealed record MlSurveySignal(
+        string PromptHint,
+        string PrimaryCategory,
+        IReadOnlyList<MlTopPredictionItem>? TopPredictions);
 
-    /// <summary>Calls the Colab-trained Python model with the same fields as the career survey UI.</summary>
+    /// <summary>Keyword fallback when Flask/FastAPI ML is offline — still order templates toward marketing, data, tech, etc.</summary>
+    private static string? InferClusterFromSurveyText(UserProfile? profile)
+    {
+        if (profile == null) return null;
+        var blob = string.Join(
+                " ",
+                new[]
+                {
+                    profile.Interests,
+                    profile.Skills,
+                    profile.UgSpecialization,
+                    profile.UgCourse,
+                    profile.CertificateCourseTitles,
+                }.Select(s => s ?? ""))
+            .ToLowerInvariant();
+        if (blob.Length < 3) return null;
+        if (blob.Contains("market", StringComparison.Ordinal) || blob.Contains("brand", StringComparison.Ordinal)
+            || blob.Contains("social media", StringComparison.Ordinal) || blob.Contains("content", StringComparison.Ordinal)
+            || blob.Contains("seo", StringComparison.Ordinal) || blob.Contains("campaign", StringComparison.Ordinal))
+            return "marketing";
+        if (blob.Contains("data science", StringComparison.Ordinal) || blob.Contains("machine learning", StringComparison.Ordinal)
+            || blob.Contains("statistics", StringComparison.Ordinal) || (blob.Contains("python", StringComparison.Ordinal) && blob.Contains("data", StringComparison.Ordinal)))
+            return "data_science";
+        if (blob.Contains("software", StringComparison.Ordinal) || blob.Contains("developer", StringComparison.Ordinal)
+            || blob.Contains("programming", StringComparison.Ordinal) || blob.Contains("devops", StringComparison.Ordinal))
+            return "technology";
+        if (blob.Contains("finance", StringComparison.Ordinal) || blob.Contains("accounting", StringComparison.Ordinal)
+            || blob.Contains("investment", StringComparison.Ordinal))
+            return "finance";
+        return null;
+    }
+
+    /// <summary>Calls the Colab-trained Python model with the same fields as the career survey UI (combined into one text for TF-IDF).</summary>
     private async Task<MlSurveySignal?> GetMlSurveySignalAsync(UserProfile? profile, CancellationToken ct)
     {
         if (profile == null) return null;
         var interests = profile.Interests?.Trim() ?? "";
         var skills = profile.Skills?.Trim() ?? "";
-        if (interests.Length == 0 && skills.Length == 0) return null;
+        var certs = profile.CertificateCourseTitles?.Trim() ?? "";
+        var ugCourse = profile.UgCourse?.Trim() ?? "";
+        var ugSpec = profile.UgSpecialization?.Trim() ?? "";
+        if (interests.Length == 0 && skills.Length == 0 && certs.Length == 0 && ugCourse.Length == 0 && ugSpec.Length == 0)
+            return null;
 
         try
         {
@@ -244,27 +319,116 @@ public class RecommendationService : IRecommendationService
                 3,
                 ct);
 
-            if (!r.Available || string.IsNullOrWhiteSpace(r.PredictedCategory)) return null;
-
-            var sb = new StringBuilder();
-            sb.Append("Primary predicted interest cluster: ").Append(r.PredictedCategory).Append('.');
-            if (r.TopPredictions is { Count: > 0 })
+            if (r.Available && !string.IsNullOrWhiteSpace(r.PredictedCategory))
             {
-                sb.Append(" Top alternatives: ");
-                sb.Append(string.Join("; ", r.TopPredictions.Select(t => $"{t.Label} ({t.Probability:P0})")));
+                var sb = new StringBuilder();
+                sb.Append("Primary predicted interest cluster: ").Append(r.PredictedCategory).Append('.');
+                if (r.TopPredictions is { Count: > 0 })
+                {
+                    sb.Append(" Top alternatives: ");
+                    sb.Append(string.Join("; ", r.TopPredictions.Select(t => $"{t.Label} ({t.Probability:P0})")));
+                }
+
+                _logger.LogInformation("Survey ML signal for recommendations: {Category}", r.PredictedCategory);
+                return new MlSurveySignal(sb.ToString(), r.PredictedCategory.Trim(), r.TopPredictions);
             }
 
-            _logger.LogInformation(
-                "Survey ML signal for recommendations: {Category}",
-                r.PredictedCategory);
+            var inferred = InferClusterFromSurveyText(profile);
+            if (inferred != null)
+            {
+                _logger.LogInformation(
+                    "ML API unavailable for recommendations; using survey keyword cluster {Cluster}",
+                    inferred);
+                return new MlSurveySignal(
+                    $"User survey text aligns with {inferred} (ML classifier unreachable — keyword routing for template order).",
+                    inferred,
+                    null);
+            }
 
-            return new MlSurveySignal(sb.ToString(), r.PredictedCategory.Trim());
+            return null;
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Survey ML call skipped for recommendations.");
-            return null;
+            var inferred = InferClusterFromSurveyText(profile);
+            return inferred == null
+                ? null
+                : new MlSurveySignal(
+                    $"User survey text aligns with {inferred} (ML call failed — keyword routing).",
+                    inferred,
+                    null);
         }
+    }
+
+    private static int MatchPercentFromProbability(double p) =>
+        (int)Math.Clamp(Math.Round(58 + p * 37), 55, 92);
+
+    private static (string Salary, string Growth) TemplateMarketHints(string category) =>
+        category switch
+        {
+            "Marketing" => ("$55,000 - $95,000", "+12%"),
+            "Data" => ("$70,000 - $120,000", "+18%"),
+            "Product" => ("$85,000 - $130,000", "+14%"),
+            "Design" => ("$65,000 - $110,000", "+13%"),
+            "Technology" => ("$80,000 - $125,000", "+16%"),
+            _ => ("See market data", "+12%"),
+        };
+
+    /// <summary>
+    /// Up to 6 careers: when ML returns top-3 labels, each label picks the best unused template; then fill from primary cluster order.
+    /// Match % and salary/growth hints come from ML probability and category.
+    /// </summary>
+    private static List<(string Title, string Desc, string Category, int Match, string Salary, string Growth)> BuildMlGuidedTemplateRows(
+        MlSurveySignal? signal)
+    {
+        const int max = 6;
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rows = new List<(string Title, string Desc, string Category, int Match, string Salary, string Growth)>();
+
+        if (signal?.TopPredictions is { Count: > 0 })
+        {
+            foreach (var t in signal.TopPredictions.OrderByDescending(x => x?.Probability ?? 0))
+            {
+                if (rows.Count >= max) break;
+                if (t == null || string.IsNullOrWhiteSpace(t.Label)) continue;
+                var listForLabel = OrderTemplatesForMlCategory(t.Label.Trim());
+                foreach (var item in listForLabel)
+                {
+                    if (!used.Add(item.Title)) continue;
+                    var (sal, gr) = TemplateMarketHints(item.Category);
+                    rows.Add((item.Title, item.Desc, item.Category, MatchPercentFromProbability(t.Probability), sal, gr));
+                    break;
+                }
+            }
+        }
+
+        var fillOrder = OrderTemplatesForMlCategory(signal?.PrimaryCategory);
+        var fallbackMatches = new[] { 87, 83, 80, 77, 74, 71 };
+        var fi = 0;
+        foreach (var item in fillOrder)
+        {
+            if (rows.Count >= max) break;
+            if (!used.Add(item.Title)) continue;
+            var m = fi < fallbackMatches.Length ? fallbackMatches[fi] : 68;
+            fi++;
+            var (sal, gr) = TemplateMarketHints(item.Category);
+            rows.Add((item.Title, item.Desc, item.Category, m, sal, gr));
+        }
+
+        if (rows.Count == 0)
+        {
+            var fb = new[] { 87, 83, 80, 77, 74, 71 };
+            var j = 0;
+            foreach (var item in RecommendationTemplateCatalog.Careers.Take(max))
+            {
+                var (sal, gr) = TemplateMarketHints(item.Category);
+                var m = j < fb.Length ? fb[j] : 70;
+                j++;
+                rows.Add((item.Title, item.Desc, item.Category, m, sal, gr));
+            }
+        }
+
+        return rows;
     }
 
     /// <summary>Put careers most aligned with the ML interest cluster first when the LLM is unavailable.</summary>
@@ -280,18 +444,28 @@ public class RecommendationService : IRecommendationService
             var t = title.ToLowerInvariant();
             return c switch
             {
-                "data_science" => t.Contains("data scientist", StringComparison.Ordinal) ? 0
+                "data_science" or "datascience" => t.Contains("data scientist", StringComparison.Ordinal) ? 0
                     : t.Contains("data analyst", StringComparison.Ordinal) ? 1
                     : t.Contains("software", StringComparison.Ordinal) ? 4
                     : 8,
-                "technology" => t.Contains("software", StringComparison.Ordinal) || t.Contains("devops", StringComparison.Ordinal) ? 0
+                "data_analyst" or "dataanalysis" => t.Contains("data analyst", StringComparison.Ordinal) ? 0
+                    : t.Contains("data scientist", StringComparison.Ordinal) ? 1
+                    : 8,
+                "technology" or "software_engineering" or "softwareengineering" or "engineering" =>
+                    t.Contains("software", StringComparison.Ordinal) || t.Contains("devops", StringComparison.Ordinal) ? 0
                     : t.Contains("data", StringComparison.Ordinal) ? 2
                     : 8,
-                "marketing" => t.Contains("product", StringComparison.Ordinal) ? 0
-                    : t.Contains("ux", StringComparison.Ordinal) ? 1
+                "marketing" or "digital_marketing" or "digitalmarketing" or "brand" =>
+                    t.Contains("digital marketing", StringComparison.Ordinal) ? 0
+                    : t.Contains("marketing analyst", StringComparison.Ordinal) ? 1
+                    : t.Contains("content strategist", StringComparison.Ordinal) ? 2
+                    : t.Contains("product", StringComparison.Ordinal) ? 3
+                    : t.Contains("ux", StringComparison.Ordinal) ? 4
+                    : t.Contains("data analyst", StringComparison.Ordinal) ? 5
                     : 8,
-                "finance" => t.Contains("analyst", StringComparison.Ordinal) ? 0
-                    : t.Contains("data", StringComparison.Ordinal) ? 1
+                "finance" or "business_analysis" or "businessanalysis" => t.Contains("analyst", StringComparison.Ordinal) ? 0
+                    : t.Contains("product", StringComparison.Ordinal) ? 1
+                    : t.Contains("data", StringComparison.Ordinal) ? 2
                     : 8,
                 "teaching" => t.Contains("ux", StringComparison.Ordinal) ? 0
                     : t.Contains("product", StringComparison.Ordinal) ? 1
