@@ -10,7 +10,7 @@ namespace BackEnd.Services;
 internal static class CareerChatFallback
 {
     /// <summary>When SQL is down, still answer using the same built-in careers as the UI sample cards.</summary>
-    public static string BuildReplyUsingTemplateCatalog(string userMessage)
+    public static string BuildReplyUsingTemplateCatalog(string? userMessage)
     {
         var now = DateTime.UtcNow;
         var fake = new List<RecommendationResponse>();
@@ -33,13 +33,13 @@ internal static class CareerChatFallback
                 LearningPath: null));
         }
 
-        return BuildReply(userMessage, fake);
+        return BuildReply(userMessage ?? "", fake);
     }
 
     public static string BuildReply(string userMessage, IReadOnlyList<RecommendationResponse> recs)
     {
-        var msg = userMessage.Trim();
-        if (recs.Count == 0)
+        var msg = (userMessage ?? "").Trim();
+        if (recs == null || recs.Count == 0)
             return "You do not have career recommendations saved yet. Generate recommendations from this page (or complete your career survey), then you can ask about salaries, skills, learning paths, or how roles compare.";
 
         // Route intents using the *current* user line only. Augmented history contains past replies with words like "salary" and would break follow-ups (e.g. "hi" matching salary).

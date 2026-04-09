@@ -145,9 +145,9 @@ Rules:
 - Be clear and concise; use short paragraphs or bullets when listing steps or skills.
 
 Recommended careers:
-{recommendationsContext}" }
+{recommendationsContext ?? ""}" }
             };
-            foreach (var m in conversationHistory)
+            foreach (var m in conversationHistory ?? Array.Empty<object>())
                 if (m != null) messages.Add(m);
             messages.Add(new { role = "user", content = userMessage ?? "" });
 

@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -87,11 +88,105 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// No auth — use to verify SQL / LocalDB from the browser: GET /api/health/db
+app.MapGet("/api/health/db", async (ApplicationDbContext db, CancellationToken ct) =>
+{
+    try
+    {
+        var can = await db.Database.CanConnectAsync(ct);
+        var name = db.Database.GetDbConnection().Database;
+        return Results.Ok(new { ok = can, database = name, provider = db.Database.ProviderName });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(
+            new { ok = false, error = ex.Message, error_type = ex.GetType().Name },
+            statusCode: 503);
+    }
+}).AllowAnonymous();
+
+// Connection + migration state (pending vs applied). No auth.
+app.MapGet("/api/health/db/diagnostics", async (ApplicationDbContext db, CancellationToken ct) =>
+{
+    try
+    {
+        var can = await db.Database.CanConnectAsync(ct);
+        if (!can)
+        {
+            return Results.Json(
+                new
+                {
+                    ok = false,
+                    stage = "connect",
+                    hint =
+                        "Cannot open SQL connection — wrong Server= in ConnectionStrings:Default, firewall, or LocalDB stopped. Start the API in Development (auto-starts LocalDB) or run: sqllocaldb start mssqllocaldb",
+                },
+                statusCode: 503);
+        }
+
+        IEnumerable<string> pending;
+        IEnumerable<string> applied;
+        try
+        {
+            pending = await db.Database.GetPendingMigrationsAsync(ct);
+            applied = await db.Database.GetAppliedMigrationsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            return Results.Json(
+                new
+                {
+                    ok = false,
+                    stage = "migrations_metadata",
+                    error = ex.Message,
+                    error_type = ex.GetType().Name,
+                    hint =
+                        "Server accepted a connection but EF could not read __EFMigrationsHistory — wrong database, manual schema changes, or corrupted DB.",
+                },
+                statusCode: 503);
+        }
+
+        var pendingArr = pending.ToArray();
+        var appliedList = applied.ToList();
+        return Results.Ok(new
+        {
+            ok = true,
+            can_connect = true,
+            database = db.Database.GetDbConnection().Database,
+            pending_migrations = pendingArr,
+            pending_count = pendingArr.Length,
+            applied_migrations_count = appliedList.Count,
+            last_applied_migration = appliedList.Count > 0 ? appliedList[^1] : null,
+            migrations_up_to_date = pendingArr.Length == 0,
+            hint = pendingArr.Length > 0
+                ? "Pending migrations exist — the API normally applies them at startup (MigrateAsync). If this stays pending, check startup logs for exceptions or run: dotnet ef database update --project Back-End"
+                : "No pending migrations; schema matches the current EF model.",
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(
+            new
+            {
+                ok = false,
+                stage = "connect",
+                error = ex.Message,
+                error_type = ex.GetType().Name,
+            },
+            statusCode: 503);
+    }
+}).AllowAnonymous();
+
 // Apply pending migrations and seed data
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+    var sp = scope.ServiceProvider;
+    var db = sp.GetRequiredService<ApplicationDbContext>();
+    var env = sp.GetRequiredService<IHostEnvironment>();
+    var config = sp.GetRequiredService<IConfiguration>();
+    var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Database");
+    BackEnd.LocalDbWindowsBootstrap.TryStartIfLocalDb(config, env, log);
+    await Task.Delay(750);
     await db.Database.MigrateAsync();
     await DataSeeder.SeedAsync(db, env);
 }

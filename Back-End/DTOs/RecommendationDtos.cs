@@ -15,7 +15,7 @@ public sealed record AiSetupStatusResponse(
 public sealed record RecommendationGenerateResponse(
     [property: JsonPropertyName("recommendations")]
     IReadOnlyList<RecommendationResponse> Recommendations,
-    /// <summary>ai | template_no_key | template_llm_failed | template_error</summary>
+    /// <summary>ai | template_no_key | template_llm_failed | template_preview_only (DB unavailable — in-memory templates). Legacy: template_error.</summary>
     [property: JsonPropertyName("generation_source")]
     string GenerationSource);
 

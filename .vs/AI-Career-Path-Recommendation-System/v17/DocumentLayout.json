@@ -3,12 +3,12 @@
   "WorkspaceRootPath": "C:\\Project\\AI-Career-Path-Recommendation-System\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|c:\\project\\ai-career-path-recommendation-system\\back-end\\appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|solutionrelative:back-end\\appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|c:\\project\\ai-career-path-recommendation-system\\back-end\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
       "RelativeMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|solutionrelative:back-end\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|c:\\project\\ai-career-path-recommendation-system\\back-end\\appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|solutionrelative:back-end\\appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
     }
   ],
   "DocumentGroupContainers": [
@@ -28,7 +28,7 @@
         },
         {
           "DockedWidth": 107,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Bookmark",
@@ -40,28 +40,29 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "appsettings.Development.json",
               "DocumentMoniker": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\appsettings.Development.json",
               "RelativeDocumentMoniker": "Back-End\\appsettings.Development.json",
               "ToolTip": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\appsettings.Development.json",
               "RelativeToolTip": "Back-End\\appsettings.Development.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAaAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAC6AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
               "WhenOpened": "2026-02-21T17:10:25.173Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "appsettings.json",
               "DocumentMoniker": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\appsettings.json",
               "RelativeDocumentMoniker": "Back-End\\appsettings.json",
               "ToolTip": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\appsettings.json",
               "RelativeToolTip": "Back-End\\appsettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAACTAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAACxAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-02-21T17:10:06.706Z"
+              "WhenOpened": "2026-02-21T17:10:06.706Z",
+              "EditorCaption": ""
             }
           ]
         },
