@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { profileAPI, mlAPI } from '../services/api';
-import { mapProfileToRecForm, buildProfilePayloadFromRecForm } from '../careerIntakeUtils';
+import { profileAPI, mlAPI, markCareerProfileNeedsRecommendationRefresh } from '../services/api';
+import {
+  mapProfileToRecForm,
+  buildProfilePayloadFromRecForm,
+  buildInitialRecForm,
+  saveCareerIntakeDraft,
+  normalizeRecFormIntakeFields,
+} from '../careerIntakeUtils';
 import CareerIntakeFormFields from '../components/CareerIntakeFormFields';
 import './PageStyles.css';
 
@@ -11,6 +17,7 @@ import './PageStyles.css';
  */
 const CareerSurvey = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [recForm, setRecForm] = useState(() => mapProfileToRecForm(null, null));
   const [profileSnapshot, setProfileSnapshot] = useState(null);
@@ -41,6 +48,10 @@ const CareerSurvey = () => {
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      if (!user) {
+        setProfileFormLoading(false);
+        return;
+      }
       setProfileFormLoading(true);
       setRecFormError('');
       setSaveMessage('');
@@ -53,7 +64,9 @@ const CareerSurvey = () => {
         }
         if (!cancelled) {
           setProfileSnapshot(snap);
-          setRecForm(mapProfileToRecForm(snap, user));
+          const initial = buildInitialRecForm(snap, user);
+          setRecForm(initial);
+          saveCareerIntakeDraft(user, initial);
         }
       } finally {
         if (!cancelled) setProfileFormLoading(false);
@@ -61,7 +74,14 @@ const CareerSurvey = () => {
     }
     load();
     return () => { cancelled = true; };
-  }, [user]);
+    // Re-load when returning to this route so fields show the latest saved profile (and merged draft).
+  }, [user, location.pathname, location.key]);
+
+  useEffect(() => {
+    if (profileFormLoading || !user) return;
+    const t = window.setTimeout(() => saveCareerIntakeDraft(user, recForm), 400);
+    return () => window.clearTimeout(t);
+  }, [recForm, profileFormLoading, user]);
 
   const validateIntake = () => {
     if (!recForm.interests?.trim()) {
@@ -117,10 +137,14 @@ const CareerSurvey = () => {
       try {
         const refreshed = await profileAPI.get();
         setProfileSnapshot(refreshed);
+        const nextForm = normalizeRecFormIntakeFields(mapProfileToRecForm(refreshed, user));
+        setRecForm(nextForm);
+        saveCareerIntakeDraft(user, nextForm);
       } catch {
         /* ignore */
       }
       localStorage.setItem('assessmentCompleted', 'true');
+      markCareerProfileNeedsRecommendationRefresh();
       setSaveMessage('Saved to your profile.');
     } catch (err) {
       console.error(err);
@@ -140,10 +164,14 @@ const CareerSurvey = () => {
       try {
         const refreshed = await profileAPI.get();
         setProfileSnapshot(refreshed);
+        const nextForm = normalizeRecFormIntakeFields(mapProfileToRecForm(refreshed, user));
+        setRecForm(nextForm);
+        saveCareerIntakeDraft(user, nextForm);
       } catch {
         /* ignore */
       }
       localStorage.setItem('assessmentCompleted', 'true');
+      markCareerProfileNeedsRecommendationRefresh();
       navigate('/recommendation', { state: { fromCareerSurvey: true } });
     } catch (err) {
       console.error(err);
@@ -244,13 +272,26 @@ const CareerSurvey = () => {
               </p>
             )}
             {mlError && (
-              <p className="jobs-muted" style={{ marginTop: '0.5rem', color: 'var(--danger, #b91c1c)' }} role="alert">
-                {mlError}
-              </p>
+              <div style={{ marginTop: '0.5rem' }} role="alert">
+                <p className="jobs-muted" style={{ color: 'var(--danger, #b91c1c)', marginBottom: '0.35rem' }}>
+                  {mlError}
+                </p>
+                {(mlError.includes('Could not reach the Flask') || mlError.includes('actively refused')) && (
+                  <p className="jobs-muted" style={{ fontSize: '0.875rem', maxWidth: '48rem', margin: 0 }}>
+                    The .NET API on port <strong>8000</strong> is fine (<strong>200 OK</strong>). The failure is the call to Python on{' '}
+                    <strong>5052</strong>. With <strong>Development</strong> + <code style={{ fontSize: '0.82em' }}>ML:AutoStartFlask</code>{' '}
+                    (see <code style={{ fontSize: '0.82em' }}>appsettings.Development.json</code>), restart the backend and wait ~10s after
+                    it starts — Flask may launch automatically. Otherwise start Python manually:{' '}
+                    <code style={{ fontSize: '0.82em' }}>.\scripts\start-flask-career-api-window.ps1</code> or{' '}
+                    <code style={{ fontSize: '0.82em' }}>ml\career_flask_api\start-career-api.ps1</code>, leave the window open, retry.
+                  </p>
+                )}
+              </div>
             )}
             <p className="jobs-muted" style={{ fontSize: '0.875rem', marginTop: '0.75rem', maxWidth: '42rem' }}>
-              For careers tailored to this survey (not the generic template list), configure a free{' '}
-              <strong>Gemini</strong> API key on the backend — see <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>.
+              <strong>Two different services:</strong> the <strong>ML preview</strong> button needs the <strong>Flask</strong> Python
+              app (your Colab model). The <strong>Recommendations</strong> page can also use <strong>Gemini / Ollama</strong> for
+              AI-written career lists — optional; see <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>.
             </p>
           </>
         )}

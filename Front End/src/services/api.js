@@ -1,4 +1,55 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+// Dev default: same-origin `/api` → Vite proxy (vite.config.js → VITE_DEV_API_PROXY_TARGET or http://localhost:8000).
+// That matches launchSettings and avoids mixed direct/proxy setups. Override with VITE_API_BASE_URL when needed.
+// Production default: full URL (set VITE_API_BASE_URL in deploy env if the API is elsewhere).
+function resolveApiBaseUrl() {
+  const raw = import.meta.env.VITE_API_BASE_URL;
+  if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
+    return String(raw).replace(/\/$/, '');
+  }
+  return import.meta.env.DEV ? '/api' : 'http://localhost:8000/api';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+/** Shown in user-facing errors. Override with VITE_API_BASE_URL if your API uses another origin/port. */
+export function getBackendHintOrigin() {
+  const raw = import.meta.env.VITE_API_BASE_URL;
+  if (raw && /^https?:\/\//i.test(String(raw))) {
+    try {
+      return new URL(String(raw).replace(/\/api\/?$/, '')).origin;
+    } catch {
+      /* fall through */
+    }
+  }
+  const proxy = import.meta.env.VITE_DEV_API_PROXY_TARGET;
+  if (import.meta.env.DEV && proxy && /^https?:\/\//i.test(String(proxy))) {
+    try {
+      return new URL(String(proxy).replace(/\/$/, '')).origin;
+    } catch {
+      /* fall through */
+    }
+  }
+  return 'http://localhost:8000';
+}
+
+function parseApiErrorJson(body) {
+  if (!body || typeof body !== 'object') return null;
+  if (typeof body.detail === 'string' && body.detail.trim()) return body.detail.trim();
+  if (typeof body.title === 'string' && body.title.trim()) {
+    const t = body.title.trim();
+    if (t !== 'One or more validation errors occurred.') return t;
+  }
+  if (body.errors && typeof body.errors === 'object') {
+    const parts = [];
+    for (const v of Object.values(body.errors)) {
+      if (Array.isArray(v)) parts.push(...v.map(String));
+      else if (v != null) parts.push(String(v));
+    }
+    const s = parts.join(' ').trim();
+    if (s) return s;
+  }
+  return null;
+}
 
 // Helper function for API calls
 /** Exported so AuthContext can ignore corrupted token values (e.g. literal "undefined" from a past bug). */
@@ -6,6 +57,33 @@ export function getStoredAccessToken() {
   const raw = localStorage.getItem('access_token');
   if (!raw || raw === 'undefined' || raw === 'null') return null;
   return raw;
+}
+
+/** Set when career survey or profile is saved; Recommendations page calls POST /generate then clears this. */
+export const CAREER_PROFILE_NEEDS_REC_REFRESH_KEY = 'career_profile_needs_rec_refresh';
+
+export function markCareerProfileNeedsRecommendationRefresh() {
+  try {
+    localStorage.setItem(CAREER_PROFILE_NEEDS_REC_REFRESH_KEY, '1');
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+export function hasCareerProfileNeedsRecommendationRefresh() {
+  try {
+    return localStorage.getItem(CAREER_PROFILE_NEEDS_REC_REFRESH_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function clearCareerProfileNeedsRecommendationRefresh() {
+  try {
+    localStorage.removeItem(CAREER_PROFILE_NEEDS_REC_REFRESH_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 async function apiCall(endpoint, options = {}) {
@@ -29,8 +107,18 @@ async function apiCall(endpoint, options = {}) {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'API request failed' }));
-      const err = new Error(error.detail || 'API request failed');
+      const text = await response.text();
+      let body = {};
+      if (text) {
+        try {
+          body = JSON.parse(text);
+        } catch {
+          body = {};
+        }
+      }
+      const fromBody = parseApiErrorJson(body);
+      const fallback = `${response.status} ${response.statusText || ''}`.trim();
+      const err = new Error(fromBody || fallback || 'Request failed');
       err.status = response.status;
       throw err;
     }
@@ -96,10 +184,12 @@ export const recommendationsAPI = {
       body: {
         message,
         // Backend accepts camelCase or snake_case; snake_case matches ConfigureHttpJsonOptions / ChatRequest
-        conversation_history: (conversationHistory || []).map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
+        conversation_history: (conversationHistory || [])
+          .filter((m) => m && (m.role != null || m.content != null))
+          .map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
       },
     }),
 };

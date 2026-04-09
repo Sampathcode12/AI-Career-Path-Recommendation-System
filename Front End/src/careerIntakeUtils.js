@@ -1,3 +1,9 @@
+import {
+  UG_COURSE_OPTIONS,
+  UG_SPECIALIZATION_OPTIONS,
+  normalizeIntakeOptionValue,
+} from './constants/careerIntakeOptions';
+
 /** Parse free-text Yes/No (and common variants) for API booleans. */
 export function parseYesNo(text) {
   const t = (text ?? '').trim().toLowerCase();
@@ -7,10 +13,116 @@ export function parseYesNo(text) {
   return null;
 }
 
-/** Read API field whether backend sent snake_case or camelCase JSON. */
+/** Read profile JSON: snake_case (.NET default here), camelCase, or PascalCase. */
 function pick(snap, snakeKey, camelKey) {
-  if (!snap) return undefined;
-  return snap[snakeKey] ?? snap[camelKey];
+  if (!snap || typeof snap !== 'object') return undefined;
+  const pascal =
+    camelKey && camelKey.length > 0
+      ? camelKey.charAt(0).toUpperCase() + camelKey.slice(1)
+      : null;
+  const keys = [snakeKey, camelKey, pascal].filter(Boolean);
+  for (const k of keys) {
+    if (!Object.prototype.hasOwnProperty.call(snap, k)) continue;
+    const val = snap[k];
+    if (val != null && val !== '') return val;
+  }
+  for (const k of keys) {
+    if (!Object.prototype.hasOwnProperty.call(snap, k)) continue;
+    const val = snap[k];
+    if (val !== undefined) return val;
+  }
+  return undefined;
+}
+
+const CAREER_INTAKE_DRAFT_PREFIX = 'career_intake_draft_v1';
+
+/** Stable key per logged-in user for browser draft of the career survey form. */
+export function careerIntakeDraftStorageKey(user) {
+  if (!user || typeof user !== 'object') return null;
+  const id =
+    user.id ??
+    user.Id ??
+    user.user_id ??
+    user.userId ??
+    user.sub ??
+    user.email ??
+    user.Email;
+  if (id == null || id === '') return null;
+  return `${CAREER_INTAKE_DRAFT_PREFIX}:${id}`;
+}
+
+export function loadCareerIntakeDraft(user) {
+  const key = careerIntakeDraftStorageKey(user);
+  if (!key || typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== 'object') return null;
+    return o;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCareerIntakeDraft(user, recForm) {
+  const key = careerIntakeDraftStorageKey(user);
+  if (!key || typeof localStorage === 'undefined' || !recForm) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(recForm));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+/**
+ * Merge one intake field: prefer a non-empty API value (saved profile), else local draft, else base.
+ * Avoids wiping the form when the API returns null/empty for fields that were never persisted but exist in draft.
+ */
+function mergeIntakeField(fromApi, draftVal, baseVal, key) {
+  if (key === 'hasCertsText' || key === 'isWorkingText') {
+    const apiOk = fromApi === 'Yes' || fromApi === 'No';
+    const drOk = draftVal === 'Yes' || draftVal === 'No';
+    if (apiOk) return fromApi;
+    if (drOk) return draftVal;
+    return '';
+  }
+  const s = (v) => (typeof v === 'string' ? v.trim() : '');
+  if (s(fromApi)) return typeof fromApi === 'string' ? fromApi.trim() : String(fromApi);
+  if (s(draftVal)) return typeof draftVal === 'string' ? draftVal.trim() : String(draftVal);
+  if (s(baseVal)) return typeof baseVal === 'string' ? baseVal.trim() : String(baseVal);
+  return '';
+}
+
+/**
+ * Form state when opening the career survey: non-empty API wins; otherwise draft; otherwise defaults.
+ */
+export function buildInitialRecForm(snap, user) {
+  const base = mapProfileToRecForm(null, user);
+  const fromApi = mapProfileToRecForm(snap, user);
+  const draft = loadCareerIntakeDraft(user) || {};
+  const allowed = new Set(Object.keys(base));
+  const cleanDraft = {};
+  for (const k of Object.keys(draft)) {
+    if (allowed.has(k)) cleanDraft[k] = draft[k];
+  }
+  const out = { ...base };
+  for (const k of Object.keys(base)) {
+    out[k] = mergeIntakeField(fromApi[k], cleanDraft[k], base[k], k);
+  }
+  out.ugCourse = normalizeIntakeOptionValue(out.ugCourse, UG_COURSE_OPTIONS);
+  out.ugSpecialization = normalizeIntakeOptionValue(out.ugSpecialization, UG_SPECIALIZATION_OPTIONS);
+  return out;
+}
+
+/** Normalize dropdown canonical values after loading from API only (e.g. after save). */
+export function normalizeRecFormIntakeFields(form) {
+  if (!form || typeof form !== 'object') return form;
+  return {
+    ...form,
+    ugCourse: normalizeIntakeOptionValue(form.ugCourse, UG_COURSE_OPTIONS),
+    ugSpecialization: normalizeIntakeOptionValue(form.ugSpecialization, UG_SPECIALIZATION_OPTIONS),
+  };
 }
 
 export function mapProfileToRecForm(profile, user) {

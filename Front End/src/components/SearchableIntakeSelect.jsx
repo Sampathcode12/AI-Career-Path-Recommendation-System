@@ -62,6 +62,14 @@ export default function SearchableIntakeSelect({
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open, closePanel]);
 
+  /** When profile/draft reloads, keep internal state aligned so the combobox shows the stored course. */
+  useEffect(() => {
+    const v = (value ?? '').trim();
+    if (predefinedValues.includes(v)) setOtherPicked(false);
+    else if (v) setOtherPicked(true);
+    else setOtherPicked(false);
+  }, [value, predefinedValues]);
+
   const pickOption = (o) => {
     setOtherPicked(false);
     setValue(o.value);

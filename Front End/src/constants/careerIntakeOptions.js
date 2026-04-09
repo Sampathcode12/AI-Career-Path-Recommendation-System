@@ -227,6 +227,22 @@ export function intakeSelectValue(storedValue, predefinedValues) {
   return INTAKE_OTHER;
 }
 
+/**
+ * Map stored text (API/draft) to a canonical option `value` when possible so dropdowns show the correct selection.
+ * Custom "Other" text is returned unchanged.
+ */
+export function normalizeIntakeOptionValue(raw, options) {
+  const v = (raw ?? '').trim();
+  if (!v) return '';
+  if (options.some((o) => o.value === v)) return v;
+  const lower = v.toLowerCase();
+  const byValue = options.find((o) => o.value.toLowerCase() === lower);
+  if (byValue) return byValue.value;
+  const byLabel = options.find((o) => o.label.toLowerCase() === lower);
+  if (byLabel) return byLabel.value;
+  return v;
+}
+
 /** Suggested career interests per UG specialization (tap-to-add in the form). */
 export const INTERESTS_BY_SPECIALIZATION = {
   'Computer Science / IT': [

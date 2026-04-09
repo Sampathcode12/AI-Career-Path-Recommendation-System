@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { profileAPI, authAPI } from '../services/api';
+import { profileAPI, authAPI, markCareerProfileNeedsRecommendationRefresh } from '../services/api';
 import './PageStyles.css';
 import './Profile.css';
 
@@ -248,6 +248,7 @@ const Profile = () => {
         await profileAPI.create(payload);
         setHasExistingProfile(true);
       }
+      markCareerProfileNeedsRecommendationRefresh();
       setProfileProgress(calculateProgress(formData));
       alert('Profile saved successfully!');
     } catch (err) {

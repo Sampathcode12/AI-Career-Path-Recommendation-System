@@ -3,7 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { Bar, Radar } from 'react-chartjs-2';
 import { CheckIcon, ChatIcon } from '../components/Icons';
 import RecommendationChatbot from '../components/RecommendationChatbot';
-import { recommendationsAPI } from '../services/api';
+import {
+  recommendationsAPI,
+  getBackendHintOrigin,
+  hasCareerProfileNeedsRecommendationRefresh,
+  clearCareerProfileNeedsRecommendationRefresh,
+} from '../services/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -18,6 +23,10 @@ import {
   Filler,
 } from 'chart.js';
 import './PageStyles.css';
+import './Recommendation.css';
+import { buildLocalCareerChatReply } from '../utils/careerChatLocal';
+
+const dbDiagnosticsUrl = () => `${getBackendHintOrigin()}/api/health/db/diagnostics`;
 
 ChartJS.register(
   CategoryScale,
@@ -53,7 +62,10 @@ const mapApiToCareer = (r) => ({
   saved: r.saved ?? false,
 });
 
-const API_BASE_HINT = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+const API_BASE_HINT =
+  import.meta.env.VITE_API_BASE_URL && String(import.meta.env.VITE_API_BASE_URL).trim()
+    ? import.meta.env.VITE_API_BASE_URL
+    : `${getBackendHintOrigin()}/api`;
 
 /** POST /generate returns { recommendations, generation_source } or (legacy) a bare array. */
 function parseGenerateResponse(data) {
@@ -73,14 +85,15 @@ function parseGenerateResponse(data) {
 const SAMPLE_RECOMMENDATIONS = [
   { id: 1, title: 'Data Scientist', match: 87, salary: '$95,000 - $140,000', growth: '+18%', description: 'Analyze complex data to help organizations make data-driven decisions.', skills: ['Python', 'Machine Learning', 'Statistics', 'Data Visualization'], requirements: { education: "Bachelor's in Computer Science, Data Science, or related", experience: '2-5 years', certifications: [] }, learningPath: [{ step: 1, title: 'Learn Python Fundamentals', duration: '2-3 months' }, { step: 2, title: 'Master Data Analysis Tools', duration: '1-2 months' }, { step: 3, title: 'Study Machine Learning', duration: '3-4 months' }, { step: 4, title: 'Build Portfolio Projects', duration: '2-3 months' }], saved: false },
   { id: 2, title: 'Software Engineer', match: 82, salary: '$85,000 - $130,000', growth: '+15%', description: 'Design, develop, and maintain software applications and systems.', skills: ['JavaScript', 'React', 'Node.js', 'System Design'], requirements: { education: "Bachelor's in Computer Science or Software Engineering", experience: '1-4 years', certifications: [] }, learningPath: [{ step: 1, title: 'Learn Programming Fundamentals', duration: '3-4 months' }, { step: 2, title: 'Master Web Technologies', duration: '2-3 months' }, { step: 3, title: 'Learn Software Architecture', duration: '2-3 months' }, { step: 4, title: 'Build Real Projects', duration: '3-4 months' }], saved: false },
-  { id: 3, title: 'Business Analyst', match: 76, salary: '$70,000 - $110,000', growth: '+12%', description: 'Bridge the gap between business needs and technical solutions.', skills: ['SQL', 'Business Analysis', 'Project Management', 'Communication'], requirements: { education: "Bachelor's in Business, IT, or related field", experience: '1-3 years', certifications: [] }, learningPath: [{ step: 1, title: 'Learn Business Fundamentals', duration: '2-3 months' }, { step: 2, title: 'Master Data Analysis', duration: '1-2 months' }, { step: 3, title: 'Study Project Management', duration: '2-3 months' }, { step: 4, title: 'Gain Industry Experience', duration: '3-6 months' }], saved: false },
+  { id: 3, title: 'Business Analyst', match: 75, salary: '$70,000 - $110,000', growth: '+12%', description: 'Bridge the gap between business needs and technical solutions.', skills: ['SQL', 'Business Analysis', 'Project Management', 'Communication'], requirements: { education: "Bachelor's in Business, IT, or related field", experience: '1-3 years', certifications: [] }, learningPath: [{ step: 1, title: 'Learn Business Fundamentals', duration: '2-3 months' }, { step: 2, title: 'Master Data Analysis', duration: '1-2 months' }, { step: 3, title: 'Study Project Management', duration: '2-3 months' }, { step: 4, title: 'Gain Industry Experience', duration: '3-6 months' }], saved: false },
 ];
 
 const Recommendation = () => {
   const location = useLocation();
   const fromAssessment = location.state?.fromAssessment === true;
   const fromCareerSurvey = location.state?.fromCareerSurvey === true;
-  const regenerateOnLoad = fromAssessment || fromCareerSurvey;
+  /** Navigation from assessment or career survey — always regenerate once on load. */
+  const navigationWantsRegenerate = fromAssessment || fromCareerSurvey;
   const [careers, setCareers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -91,7 +104,7 @@ const Recommendation = () => {
   const [pendingAskCareer, setPendingAskCareer] = useState(null);
   /** True when API failed or UI is showing sample / offline template rows. */
   const [usingTemplateRecommendations, setUsingTemplateRecommendations] = useState(false);
-  /** From last generate: ai | template_no_key | template_llm_failed | template_error | offline | null */
+  /** From last generate: ai | template_no_key | template_llm_failed | template_error | template_preview_only | offline | null */
   const [generationSource, setGenerationSource] = useState(null);
   /** From GET /recommendations/ai-setup-status — tells us if Gemini/OpenAI key is configured on the server. */
   const [aiSetupStatus, setAiSetupStatus] = useState(null);
@@ -139,7 +152,8 @@ const Recommendation = () => {
     const isNonAiGenerate =
       source === 'template_no_key' ||
       source === 'template_llm_failed' ||
-      source === 'template_error';
+      source === 'template_error' ||
+      source === 'template_preview_only';
 
     setGenerationSource(source);
     setUsingTemplateRecommendations(Boolean(fromApiError || isOfflineSample || isNonAiGenerate));
@@ -157,9 +171,13 @@ const Recommendation = () => {
         await refreshAiSetupStatus();
         if (cancelled) return;
 
-        if (regenerateOnLoad) {
+        const savedProfileNeedsRefresh = hasCareerProfileNeedsRecommendationRefresh();
+        if (navigationWantsRegenerate || savedProfileNeedsRefresh) {
           const gen = await recommendationsAPI.generate();
-          if (!cancelled) applyRecommendationList(gen);
+          if (!cancelled) {
+            applyRecommendationList(gen);
+            clearCareerProfileNeedsRecommendationRefresh();
+          }
         } else {
           const data = await recommendationsAPI.getAll();
           const list = Array.isArray(data) ? data.map(mapApiToCareer) : [];
@@ -185,7 +203,7 @@ const Recommendation = () => {
     }
     init();
     return () => { cancelled = true; };
-  }, [regenerateOnLoad, applyRecommendationList, refreshAiSetupStatus]);
+  }, [navigationWantsRegenerate, applyRecommendationList, refreshAiSetupStatus]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -193,6 +211,7 @@ const Recommendation = () => {
     try {
       const data = await recommendationsAPI.generate();
       applyRecommendationList(data);
+      clearCareerProfileNeedsRecommendationRefresh();
       await refreshAiSetupStatus();
     } catch (err) {
       console.error(err);
@@ -252,11 +271,29 @@ const Recommendation = () => {
     } catch (err) {
       console.error(err);
       const errMsg = err?.message || 'Failed to send message. Please try again.';
+      const status = err?.status;
+      const isNetwork =
+        errMsg === 'Failed to fetch' ||
+        err?.name === 'TypeError' ||
+        (typeof errMsg === 'string' && errMsg.toLowerCase().includes('network'));
+      const localReply = buildLocalCareerChatReply(message, careers, historySnapshot);
       let displayMsg = errMsg;
-      if (errMsg.includes('401')) displayMsg = 'Please log in again.';
-      else if (errMsg.includes('403')) displayMsg = 'Access denied.';
-      else if (errMsg.includes('503') || errMsg.toLowerCase().includes('unavailable')) displayMsg = 'The server could not complete chat right now. Check that the backend is running and try again.';
-      else if (errMsg.includes('API request failed') || errMsg.includes('Failed to fetch')) displayMsg = 'Could not reach the server. Make sure the backend is running at http://localhost:8000 and try again.';
+      if (status === 401) displayMsg = 'Please log in again.';
+      else if (status === 403) displayMsg = 'Access denied.';
+      else if (localReply && (status === 500 || status === 502 || status === 503 || isNetwork))
+        displayMsg = localReply;
+      else if (status === 503 || errMsg.toLowerCase().includes('unavailable'))
+        displayMsg =
+          localReply ||
+          'The server could not complete chat right now. Check that the backend is running and try again.';
+      else if (status === 500)
+        displayMsg =
+          localReply ||
+          'Could not reach the API (HTTP 500). In dev, restart the .NET app on port 8000 and restart `npm run dev` so Vite reloads vite.config.js (proxy /api → http://localhost:8000). IIS Express must use the same port as in launchSettings.';
+      else if (isNetwork)
+        displayMsg =
+          localReply ||
+          `Could not reach the API. Start the .NET backend (e.g. ${getBackendHintOrigin()}) and reload. If you use a custom URL, set VITE_API_BASE_URL in Front End/.env.`;
       setChatHistory((h) => [
         ...h,
         { role: 'assistant', content: displayMsg },
@@ -331,59 +368,101 @@ const Recommendation = () => {
   const showConnectAiPanel =
     aiSetupLoaded && aiSetupStatus && !aiSetupStatus.llmConfigured;
 
+  /** Orange strip: not for normal no-key flow or DB preview-only (those use teal info). */
   const showOrangeTemplateBanner =
     usingTemplateRecommendations &&
     !loading &&
-    !(generationSource === 'template_no_key' && showConnectAiPanel);
+    generationSource !== 'template_no_key' &&
+    generationSource !== 'template_preview_only';
+
+  /** DB couldn't persist — server returned in-memory template rows (negative ids). Hide if user already has real rows from SQL. */
+  const hasPersistedRecommendationRows =
+    careers.length > 0 && careers.every((c) => c.id > 0);
+  const showDbPreviewInfo =
+    generationSource === 'template_preview_only' && !loading && !hasPersistedRecommendationRows;
 
   return (
     <section className="page-section">
       <div className="card">
         <h2>AI-Based Career Recommendation</h2>
         <p className="page-lede" style={{ marginBottom: '1.25rem' }}>
-          Recommendations use your saved <Link to="/career-survey">career survey</Link> (interests, skills, UG fields) and
-          skill assessment. When the survey ML service is running (<code style={{ fontSize: '0.85em' }}>ml/predict_api.py</code>
-          + <code style={{ fontSize: '0.85em' }}>ML:PythonPredictBaseUrl</code>), generate/regenerate also uses that model to
-          steer career paths; with a configured Gemini/OpenAI key, the list is AI-ranked using both.
+          Recommendations use your saved <Link to="/career-survey">career survey</Link> (interests, skills, certificates, UG fields) and
+          skill assessment. When the Python ML service is running (<code style={{ fontSize: '0.85em' }}>ml/career_flask_api</code>{' '}
+          or <code style={{ fontSize: '0.85em' }}>ml/predict_api.py</code> +{' '}
+          <code style={{ fontSize: '0.85em' }}>ML:PythonPredictBaseUrl</code> / <code style={{ fontSize: '0.85em' }}>PythonPredictStyle</code>
+          ), that text is sent through your trained model: the predicted career cluster steers the suggested paths (and reorders built-in
+          templates if the AI is unavailable). For cloud LLMs, configure an API key; for a fully local open-source model, set{' '}
+          <code style={{ fontSize: '0.85em' }}>AI:Provider</code> to <code style={{ fontSize: '0.85em' }}>Local</code> and run{' '}
+          <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a> — see{' '}
+          <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>. The chat on this page uses the same provider and your saved recommendation list.
         </p>
 
         {showConnectAiPanel && (
           <div
             role="status"
+            className="reco-dashboard-hint"
             style={{
-              marginBottom: '1.25rem',
-              padding: '0.85rem 1rem',
-              background: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.35)',
+              marginBottom: '1rem',
+              padding: '0.65rem 0.9rem',
+              background: 'rgba(13, 115, 119, 0.06)',
+              border: '1px solid rgba(13, 115, 119, 0.22)',
               borderRadius: 'var(--radius-sm)',
-              fontSize: '0.9rem',
+              fontSize: '0.88rem',
               color: 'var(--text)',
             }}
           >
-            <strong>Turn on the built-in AI (Gemini / ChatGPT / Groq / Ollama):</strong> your backend is set to{' '}
-            <code style={{ fontSize: '0.85em' }}>{aiSetupStatus.provider || 'Gemini'}</code>
+            <strong>Optional — cloud AI:</strong> Provider{' '}
+            <code style={{ fontSize: '0.82em' }}>{aiSetupStatus.provider || 'Gemini'}</code>
             {aiSetupStatus.model ? (
               <>
                 {' '}
-                with model <code style={{ fontSize: '0.85em' }}>{aiSetupStatus.model}</code>
+                (<code style={{ fontSize: '0.82em' }}>{aiSetupStatus.model}</code>)
               </>
-            ) : null}
-            , but <strong>no API key is loaded</strong>, so the app cannot call Google or OpenAI yet — you only see generic
-            template careers until a key is set.
-            <br />
-            <span style={{ display: 'block', marginTop: '0.5rem' }}>
-              <strong>Free Gemini (easiest):</strong>{' '}
-              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
-                create a key in Google AI Studio
-              </a>
-              , then put it in <code style={{ fontSize: '0.85em' }}>Back-End/appsettings.json</code> →{' '}
-              <code style={{ fontSize: '0.85em' }}>AI:Gemini:ApiKey</code>, or set env{' '}
-              <code style={{ fontSize: '0.85em' }}>GEMINI_API_KEY</code>, or{' '}
-              <code style={{ fontSize: '0.85em' }}>dotnet user-secrets set &quot;AI:Gemini:ApiKey&quot; &quot;…&quot;</code>{' '}
-              in the Back-End folder. For OpenAI or Groq, set <code style={{ fontSize: '0.85em' }}>AI:Provider</code> and
-              the matching key (see <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>). Restart the API, then
-              click <strong>Regenerate</strong>.
-            </span>
+            ) : null}{' '}
+            has no API key yet. You can still use survey-guided template careers and the Career Advisor (rule-based). Add a key
+            for personalized AI text — or set <code style={{ fontSize: '0.82em' }}>AI:Provider</code> to{' '}
+            <code style={{ fontSize: '0.82em' }}>Local</code> with Ollama.
+            <details style={{ marginTop: '0.5rem' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>Setup steps (Gemini / Local)</summary>
+              <div style={{ marginTop: '0.5rem', lineHeight: 1.5 }}>
+                <p style={{ margin: '0 0 0.5rem' }}>
+                  <strong>Local (no key):</strong> set <code style={{ fontSize: '0.82em' }}>AI:Provider</code> to{' '}
+                  <code style={{ fontSize: '0.82em' }}>Local</code>, run{' '}
+                  <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a>, pull a model, restart the API.
+                </p>
+                <p style={{ margin: 0 }}>
+                  <strong>Gemini:</strong>{' '}
+                  <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
+                    Google AI Studio key
+                  </a>
+                  , then <code style={{ fontSize: '0.82em' }}>AI:Gemini:ApiKey</code> in appsettings or <code style={{ fontSize: '0.82em' }}>GEMINI_API_KEY</code>. See{' '}
+                  <code style={{ fontSize: '0.82em' }}>docs/OPENAI-SETUP.md</code>. Restart the API and <strong>Regenerate</strong>.
+                </p>
+              </div>
+            </details>
+          </div>
+        )}
+
+        {showDbPreviewInfo && (
+          <div
+            role="status"
+            style={{
+              marginBottom: '1rem',
+              padding: '0.65rem 0.9rem',
+              background: 'rgba(13, 115, 119, 0.07)',
+              border: '1px solid rgba(13, 115, 119, 0.25)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.88rem',
+              color: 'var(--text)',
+            }}
+          >
+            <strong>Preview mode:</strong> the API could not save this list to SQL Server (wrong <code style={{ fontSize: '0.82em' }}>ConnectionStrings</code>, SQL service stopped, login denied, or firewall). You can still browse the
+            templates below. Check{' '}
+            <a href={dbDiagnosticsUrl()} target="_blank" rel="noopener noreferrer">
+              database diagnostics
+            </a>
+            , fix <code style={{ fontSize: '0.82em' }}>Back-End/appsettings.json</code>, restart the API, then <strong>Regenerate</strong>. For LocalDB only: run{' '}
+            <code style={{ fontSize: '0.82em' }}>sqllocaldb start mssqllocaldb</code>.
           </div>
         )}
 
@@ -391,50 +470,36 @@ const Recommendation = () => {
           <p
             role="status"
             style={{
-              marginBottom: '1.25rem',
-              padding: '0.75rem 1rem',
-              background: 'rgba(245, 158, 11, 0.12)',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
+              marginBottom: '1rem',
+              padding: '0.65rem 0.9rem',
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.32)',
               borderRadius: 'var(--radius-sm)',
-              fontSize: '0.9rem',
+              fontSize: '0.88rem',
               color: 'var(--text)',
             }}
           >
-            {generationSource === 'template_no_key' && (
-              <>
-                <strong>Not AI-personalized yet:</strong> No API key is configured on the server. Use the blue box above
-                (if visible) or see <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>, restart the API, then{' '}
-                <strong>Regenerate</strong>.
-              </>
-            )}
             {generationSource === 'template_llm_failed' && (
               <>
-                <strong>AI call failed:</strong> A key may be set, but the provider did not return usable recommendations
-                (wrong model name, quota, network, or invalid JSON). Check the API console, try{' '}
-                <code style={{ fontSize: '0.85em' }}>gemini-2.0-flash</code> in appsettings, and restart the backend. Showing
-                template careers until generation succeeds — click <strong>Regenerate</strong> after fixing.
+                <strong>Cloud AI did not return careers:</strong> check model name, quota, and network in the API logs, then{' '}
+                <strong>Regenerate</strong>. Templates below are still valid.
               </>
             )}
             {generationSource === 'offline' && (
               <>
-                <strong>Could not reach the API:</strong> the browser request failed (backend not running, wrong URL, or
-                session expired). Confirm the API is up at <code style={{ fontSize: '0.85em' }}>{API_BASE_HINT}</code>,
-                check <code style={{ fontSize: '0.85em' }}>VITE_API_BASE_URL</code> in the front end, and log in again if
-                you see 401 errors. After the connection works, add a Gemini/OpenAI key (see{' '}
-                <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>) and click <strong>Regenerate</strong>.
+                <strong>Could not reach the API.</strong> Start the backend at <code style={{ fontSize: '0.82em' }}>{API_BASE_HINT}</code>, check{' '}
+                <code style={{ fontSize: '0.82em' }}>VITE_API_BASE_URL</code>, and log in again if needed.
               </>
             )}
             {generationSource === 'template_error' && (
               <>
-                <strong>Server error while saving recommendations:</strong> check backend logs and SQL connection. After
-                fixing, click <strong>Regenerate</strong>. For personalized careers you still need an AI API key — see{' '}
-                <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>.
+                <strong>Generation hit a server issue</strong> (often SQL Server / LocalDB). Check the API console, fix the connection string if needed, then{' '}
+                <strong>Regenerate</strong>. Showing saved template rows for now.
               </>
             )}
             {(generationSource === null || generationSource === undefined) && (
               <>
-                <strong>Demo / sample data:</strong> you are seeing local example careers (not from your profile). Use{' '}
-                <strong>Regenerate</strong> after the API is connected, or configure an AI key as in the blue box above.
+                <strong>Sample preview:</strong> connect the API and click <strong>Regenerate</strong> to load careers from your profile.
               </>
             )}
           </p>
@@ -489,57 +554,48 @@ const Recommendation = () => {
           </p>
         ) : (
           <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2rem' }}>
+            <div className="rec-career-list">
               {careers.map((career) => (
                 <div
                   key={career.id}
-                  className="career-card"
-                  style={{
-                    border: selectedCareer?.id === career.id ? '2px solid var(--accent)' : '1px solid var(--border-light)',
-                    cursor: 'pointer',
-                  }}
+                  className={`rec-career-card${selectedCareer?.id === career.id ? ' rec-career-card--selected' : ''}`}
                   onClick={() => setSelectedCareer(career)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedCareer(career);
+                    }
+                  }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                        <h3 style={{ margin: 0 }}>{career.title}</h3>
-                        <span
-                          style={{
-                            padding: '0.25rem 0.75rem',
-                            backgroundColor: 'rgba(13, 115, 119, 0.08)',
-                            color: 'var(--accent)',
-                            borderRadius: '20px',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                          }}
-                        >
-                          {career.match}% Match
+                  <div className="rec-career-top">
+                    <div className="rec-career-main">
+                      <div className="rec-career-title-row">
+                        <h3 className="rec-career-title">{career.title}</h3>
+                        <span className="rec-career-match-badge">{career.match}% Match</span>
+                      </div>
+                      {career.description ? (
+                        <p className="rec-career-desc">{career.description}</p>
+                      ) : null}
+                      <p className="rec-career-meta">
+                        <span className="rec-career-meta-item">
+                          <strong>Salary:</strong> {career.salary}
                         </span>
-                      </div>
-                      <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>{career.description}</p>
-                      <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.875rem' }}>
-                        <span><strong>Salary:</strong> {career.salary}</span>
-                        {career.growth && (
-                          <span><strong>Growth:</strong> <span style={{ color: 'var(--success-color)' }}>{career.growth}</span></span>
-                        )}
-                      </div>
+                        {career.growth ? (
+                          <span className="rec-career-meta-item">
+                            <strong>Growth:</strong> {career.growth}
+                          </span>
+                        ) : null}
+                      </p>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <div className="rec-career-actions">
                       <button
                         type="button"
+                        className="rec-career-btn rec-career-btn--ask"
                         onClick={(e) => {
                           e.stopPropagation();
                           askAboutCareer(career.title);
-                        }}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          background: 'transparent',
-                          border: '1px solid var(--accent)',
-                          color: 'var(--accent)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
                         }}
                         title="Ask questions about this career"
                       >
@@ -547,20 +603,16 @@ const Recommendation = () => {
                         Ask
                       </button>
                       <button
+                        type="button"
+                        className={`rec-career-btn rec-career-btn--save${career.saved ? ' saved' : ''}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleSave(career.id, career.saved);
                         }}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          background: career.saved ? 'var(--success-color)' : 'transparent',
-                          border: `1px solid ${career.saved ? 'var(--success-color)' : 'var(--border-color)'}`,
-                          color: career.saved ? 'white' : 'var(--text-secondary)',
-                        }}
                       >
                         {career.saved ? (
                           <>
-                            <CheckIcon size={16} color="white" style={{ marginRight: '0.25rem', display: 'inline-block' }} />
+                            <CheckIcon size={16} color="currentColor" style={{ display: 'inline-block' }} />
                             Saved
                           </>
                         ) : (
