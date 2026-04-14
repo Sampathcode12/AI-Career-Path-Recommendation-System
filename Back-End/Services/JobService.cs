@@ -12,6 +12,24 @@ public class JobService : IJobService
 
     public JobService(ApplicationDbContext db) => _db = db;
 
+    /// <summary>
+    /// Matches job-search / Top 10 category values against <see cref="JobListing.Category"/> or <see cref="JobListing.Sector"/>
+    /// (exact after trim, case-insensitive), plus sector labels like "Technology &amp; Analytics" when filter is "Technology".
+    /// </summary>
+    private static IQueryable<JobListing> WhereMatchesCategoryOrSector(IQueryable<JobListing> query, string categoryTrimmed)
+    {
+        var catLower = categoryTrimmed.ToLowerInvariant();
+        var sectorPrefixSpace = catLower + " ";
+        var sectorPrefixAmp = catLower + "&";
+        var sectorPrefixSlash = catLower + "/";
+        return query.Where(j =>
+            (j.Category != null && j.Category.Trim().ToLower() == catLower)
+            || (j.Sector != null && j.Sector.Trim().ToLower() == catLower)
+            || (j.Sector != null && j.Sector.Trim().ToLower().StartsWith(sectorPrefixSpace))
+            || (j.Sector != null && j.Sector.Trim().ToLower().StartsWith(sectorPrefixAmp))
+            || (j.Sector != null && j.Sector.Trim().ToLower().StartsWith(sectorPrefixSlash)));
+    }
+
     public async Task<IReadOnlyList<JobListingResponse>> SearchAsync(JobSearchRequest request, int? userId, CancellationToken ct = default)
     {
         var query = _db.JobListings.AsNoTracking();
@@ -30,9 +48,7 @@ public class JobService : IJobService
             && !string.Equals(request.Category.Trim(), "All", StringComparison.OrdinalIgnoreCase))
         {
             var cat = request.Category.Trim();
-            query = query.Where(j =>
-                j.Category != null
-                && string.Equals(j.Category, cat, StringComparison.OrdinalIgnoreCase));
+            query = WhereMatchesCategoryOrSector(query, cat);
         }
         if (!string.IsNullOrWhiteSpace(request.Sector))
             query = query.Where(j => j.Sector != null && j.Sector.ToLower().Contains(request.Sector.ToLower()));
@@ -47,9 +63,7 @@ public class JobService : IJobService
             && !string.Equals(category.Trim(), "All", StringComparison.OrdinalIgnoreCase))
         {
             var cat = category.Trim();
-            query = query.Where(j =>
-                j.Category != null
-                && string.Equals(j.Category, cat, StringComparison.OrdinalIgnoreCase));
+            query = WhereMatchesCategoryOrSector(query, cat);
         }
         var list = await query.OrderBy(j => j.Title).Take(limit).ToListAsync(ct);
         return list.Select(ToListingResponse).ToList();

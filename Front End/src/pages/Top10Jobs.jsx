@@ -271,7 +271,7 @@ const ALL_JOBS_MOCK = [
     rank: 12,
     title: 'UX Designer',
     sector: 'Technology',
-    category: 'Creative',
+    category: 'Creative & Design',
     salary: '$70,000 – $140,000',
     growth: '+13%',
     description: 'Design user experiences and interfaces. Research, wireframes, and usability testing.',

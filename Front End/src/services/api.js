@@ -200,7 +200,9 @@ export const jobsAPI = {
     method: 'POST',
     body: filters,
   }),
-  getTop: (category, limit = 10) => apiCall(`/jobs/top?category=${encodeURIComponent(category || '')}&limit=${limit}`),
+  /** cache: no-store avoids stale GET lists when switching category in dev tools / aggressive HTTP caches */
+  getTop: (category, limit = 10) =>
+    apiCall(`/jobs/top?category=${encodeURIComponent(category || '')}&limit=${limit}`, { cache: 'no-store' }),
   getSaved: () => apiCall('/jobs/saved'),
   save: (jobData) => apiCall('/jobs/save', {
     method: 'POST',
