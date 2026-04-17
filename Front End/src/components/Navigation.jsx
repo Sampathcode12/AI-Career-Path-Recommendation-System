@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { HomeIcon, UserIcon, ChecklistIcon, TargetIcon, TrendingUpIcon, SearchIcon, StarIcon, ChartIcon, LogoutIcon } from './Icons';
+import { HomeIcon, UserIcon, ChecklistIcon, TargetIcon, TrendingUpIcon, StarIcon, ChartIcon, LogoutIcon } from './Icons';
 import './Navigation.css';
 
 const Navigation = () => {
@@ -39,10 +39,6 @@ const Navigation = () => {
       <Link to="/dashboard" className={isActive('/dashboard')}>
         <TrendingUpIcon size={18} color="currentColor" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
         Market Trends
-      </Link>
-      <Link to="/jobsearch" className={isActive('/jobsearch')}>
-        <SearchIcon size={18} color="currentColor" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-        Job Search
       </Link>
       <Link to="/top-jobs" className={isActive('/top-jobs')}>
         <StarIcon size={18} color="currentColor" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />

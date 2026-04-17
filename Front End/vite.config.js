@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
   // Must match the URL where the .NET API listens (see Back-End/Properties/launchSettings.json — http profile uses 8000).
   // If you run IIS Express on another port, set VITE_DEV_API_PROXY_TARGET in Front End/.env.development
   const apiProxyTarget = env.VITE_DEV_API_PROXY_TARGET || 'http://localhost:8000'
+  // Kestrel https profile uses a dev certificate; allow proxying to https://localhost:7189 without cert verification errors.
+  const proxyToHttps = /^https:\/\//i.test(apiProxyTarget)
 
   return {
     plugins: [react()],
@@ -15,6 +17,7 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: apiProxyTarget,
           changeOrigin: true,
+          secure: proxyToHttps ? false : true,
         },
       },
     },
