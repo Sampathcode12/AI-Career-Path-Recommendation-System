@@ -3,6 +3,14 @@
   "WorkspaceRootPath": "C:\\Project\\AI-Career-Path-Recommendation-System\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|c:\\project\\ai-career-path-recommendation-system\\back-end\\data\\industry-skill-gaps.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|solutionrelative:back-end\\data\\industry-skill-gaps.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|c:\\project\\ai-career-path-recommendation-system\\back-end\\data\\market-trends.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|solutionrelative:back-end\\data\\market-trends.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|c:\\project\\ai-career-path-recommendation-system\\back-end\\data\\dataseeder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}|Back-End\\BackEnd.csproj|solutionrelative:back-end\\data\\dataseeder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -32,8 +40,34 @@
         },
         {
           "DockedWidth": 107,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 1,
           "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "market-trends.json",
+              "DocumentMoniker": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\Data\\market-trends.json",
+              "RelativeDocumentMoniker": "Back-End\\Data\\market-trends.json",
+              "ToolTip": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\Data\\market-trends.json",
+              "RelativeToolTip": "Back-End\\Data\\market-trends.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-04-17T08:08:00.103Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "industry-skill-gaps.json",
+              "DocumentMoniker": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\Data\\industry-skill-gaps.json",
+              "RelativeDocumentMoniker": "Back-End\\Data\\industry-skill-gaps.json",
+              "ToolTip": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\Data\\industry-skill-gaps.json",
+              "RelativeToolTip": "Back-End\\Data\\industry-skill-gaps.json",
+              "ViewState": "AgIAAOIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-04-17T08:07:53.889Z",
+              "EditorCaption": ""
+            },
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{0ad07096-bba9-4900-a651-0598d26f6d24}"
@@ -44,20 +78,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "DataSeeder.cs",
               "DocumentMoniker": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\Data\\DataSeeder.cs",
               "RelativeDocumentMoniker": "Back-End\\Data\\DataSeeder.cs",
               "ToolTip": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\Data\\DataSeeder.cs",
               "RelativeToolTip": "Back-End\\Data\\DataSeeder.cs",
-              "ViewState": "AgIAAH8AAAAAAAAAAAAkwMoAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAIIAAAAAAAAAAAAAAIgAAAAbAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-04-15T03:01:31.817Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 4,
               "Title": "appsettings.Development.json",
               "DocumentMoniker": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\appsettings.Development.json",
               "RelativeDocumentMoniker": "Back-End\\appsettings.Development.json",
@@ -69,7 +103,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "appsettings.json",
               "DocumentMoniker": "C:\\Project\\AI-Career-Path-Recommendation-System\\Back-End\\appsettings.json",
               "RelativeDocumentMoniker": "Back-End\\appsettings.json",
@@ -77,8 +111,7 @@
               "RelativeToolTip": "Back-End\\appsettings.json",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAACxAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-02-21T17:10:06.706Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-02-21T17:10:06.706Z"
             }
           ]
         },
