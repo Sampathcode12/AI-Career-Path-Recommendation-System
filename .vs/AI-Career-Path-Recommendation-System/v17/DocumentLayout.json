@@ -40,8 +40,16 @@
         },
         {
           "DockedWidth": 107,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 3,
           "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{0ad07096-bba9-4900-a651-0598d26f6d24}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+            },
             {
               "$type": "Document",
               "DocumentIndex": 1,
@@ -52,8 +60,7 @@
               "RelativeToolTip": "Back-End\\Data\\market-trends.json",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-04-17T08:08:00.103Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-04-17T08:08:00.103Z"
             },
             {
               "$type": "Document",
@@ -69,14 +76,6 @@
               "EditorCaption": ""
             },
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{0ad07096-bba9-4900-a651-0598d26f6d24}"
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
-            },
-            {
               "$type": "Document",
               "DocumentIndex": 2,
               "Title": "DataSeeder.cs",
@@ -86,8 +85,7 @@
               "RelativeToolTip": "Back-End\\Data\\DataSeeder.cs",
               "ViewState": "AgIAAIIAAAAAAAAAAAAAAIgAAAAbAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-15T03:01:31.817Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-04-15T03:01:31.817Z"
             },
             {
               "$type": "Document",
