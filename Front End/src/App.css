@@ -12,3 +12,21 @@
   width: 100%;
   box-sizing: border-box;
 }
+
+.deployment-api-banner {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  background: #fff3cd;
+  color: #664d03;
+  border-bottom: 1px solid #e6d4a0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.deployment-api-banner code {
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}

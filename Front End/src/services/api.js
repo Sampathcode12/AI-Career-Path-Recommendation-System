@@ -22,6 +22,19 @@ export function getResolvedApiBaseUrl() {
   return API_BASE_URL;
 }
 
+/**
+ * True when this is a production build still using same-origin `/api` on a public host (e.g. Vercel).
+ * Means VITE_API_BASE_URL / BACKEND_API_BASE_URL was not set at build time — requests hit the static host and 404.
+ */
+export function isDeployedWithoutExplicitApiBase() {
+  if (!import.meta.env.PROD) return false;
+  if (API_BASE_URL !== '/api') return false;
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname || '';
+  if (h === 'localhost' || h === '127.0.0.1') return false;
+  return /\.vercel\.app$/i.test(h) || h.includes('vercel.app');
+}
+
 function isLikelyNetworkFailure(error) {
   if (!error) return false;
   if (error instanceof TypeError) return true;

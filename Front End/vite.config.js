@@ -17,16 +17,21 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const buildApiBase = resolveBuildApiBaseUrl(env)
 
+  // Vercel sets VERCEL_URL on every build; VERCEL=1 is not always visible in nested npm scripts on some setups.
+  const buildingOnVercel =
+    (typeof process.env.VERCEL_URL === 'string' && process.env.VERCEL_URL.trim() !== '') ||
+    process.env.VERCEL === '1'
+
   if (
     mode === 'production' &&
-    process.env.VERCEL === '1' &&
+    buildingOnVercel &&
     !buildApiBase &&
     process.env.VERCEL_SKIP_API_ENV_CHECK !== '1'
   ) {
     throw new Error(
-      'Vercel production build: set VITE_API_BASE_URL or BACKEND_API_BASE_URL to your deployed .NET API base (include /api), ' +
-        'e.g. https://my-api.azurewebsites.net/api — Vercel → Project → Settings → Environment Variables, then redeploy. ' +
-        'Optional: set VERCEL_SKIP_API_ENV_CHECK=1 only if you use same-origin /api rewrites to the backend.'
+      'Vercel build: set VITE_API_BASE_URL or BACKEND_API_BASE_URL to your live .NET API base (include /api), ' +
+        'e.g. https://my-api.azurewebsites.net/api — Vercel → Project → Settings → Environment Variables → Production & Preview, then redeploy. ' +
+        'Optional: VERCEL_SKIP_API_ENV_CHECK=1 only if you proxy /api to the API via vercel.json rewrites.'
     )
   }
 
