@@ -1,6 +1,13 @@
-// Default: same-origin `/api`. In dev, Vite proxies `/api` → VITE_DEV_API_PROXY_TARGET or http://localhost:8000 (vite.config.js).
-// In production (e.g. Vercel), set VITE_API_BASE_URL to your deployed .NET API base (e.g. https://api.example.com/api) and redeploy.
+// Dev default: same-origin `/api` → Vite proxy (vite.config.js). Production: vite.config injects __BUILD_API_BASE__ from
+// VITE_API_BASE_URL or BACKEND_API_BASE_URL (Vercel env). If empty, falls back to `/api` (same-origin rewrites only).
+function buildTimeApiBase() {
+  const b = __BUILD_API_BASE__;
+  return b != null && String(b).trim() !== '' ? String(b).replace(/\/$/, '') : '';
+}
+
 function resolveApiBaseUrl() {
+  const injected = buildTimeApiBase();
+  if (injected) return injected;
   const raw = import.meta.env.VITE_API_BASE_URL;
   if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
     return String(raw).replace(/\/$/, '');
@@ -9,6 +16,11 @@ function resolveApiBaseUrl() {
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
+
+/** Full configured API base path (for UI hints). Same as requests use. */
+export function getResolvedApiBaseUrl() {
+  return API_BASE_URL;
+}
 
 function isLikelyNetworkFailure(error) {
   if (!error) return false;
@@ -46,6 +58,14 @@ export function formatApiNetworkError(error) {
 
 /** Shown in user-facing errors. Override with VITE_API_BASE_URL if your API uses another origin/port. */
 export function getBackendHintOrigin() {
+  const injected = buildTimeApiBase();
+  if (injected && /^https?:\/\//i.test(injected)) {
+    try {
+      return new URL(injected.replace(/\/api\/?$/, '')).origin;
+    } catch {
+      /* fall through */
+    }
+  }
   const raw = import.meta.env.VITE_API_BASE_URL;
   if (raw && /^https?:\/\//i.test(String(raw))) {
     try {

@@ -7,6 +7,7 @@ import {
   recommendationsAPI,
   profileAPI,
   getBackendHintOrigin,
+  getResolvedApiBaseUrl,
   hasCareerProfileNeedsRecommendationRefresh,
   clearCareerProfileNeedsRecommendationRefresh,
 } from '../services/api';
@@ -64,10 +65,10 @@ const mapApiToCareer = (r) => ({
   saved: r.saved ?? false,
 });
 
-const API_BASE_HINT =
-  import.meta.env.VITE_API_BASE_URL && String(import.meta.env.VITE_API_BASE_URL).trim()
-    ? import.meta.env.VITE_API_BASE_URL
-    : `${getBackendHintOrigin()}/api`;
+const resolvedApiBase = getResolvedApiBaseUrl();
+const API_BASE_HINT = resolvedApiBase.startsWith('http')
+  ? resolvedApiBase
+  : `${getBackendHintOrigin()}/api`;
 
 /** POST /generate returns { recommendations, generation_source } or (legacy) a bare array. */
 function parseGenerateResponse(data) {
