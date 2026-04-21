@@ -125,6 +125,13 @@ export function normalizeRecFormIntakeFields(form) {
   };
 }
 
+/** True when saved profile has the same minimum fields required to submit the career survey (interests + skills). */
+export function isCareerIntakeComplete(profileSnap) {
+  if (!profileSnap || typeof profileSnap !== 'object') return false;
+  const f = mapProfileToRecForm(profileSnap, { name: '' });
+  return Boolean(f.interests?.trim()) && Boolean(f.skillsText?.trim());
+}
+
 export function mapProfileToRecForm(profile, user) {
   const snap = profile || null;
   const bool = (s, c) => pick(snap, s, c);

@@ -1,0 +1,13 @@
+# Put Colab exports here (use ONE set):
+#
+# Pickle (untitled5.py):
+#   vectorizer.pkl
+#   career_model.pkl
+#   label_encoder.pkl
+#
+# Joblib:
+#   tfidf_vectorizer.joblib
+#   interest_xgb_model.joblib
+#   target_label_encoder.joblib
+#
+# Optional: classes.json

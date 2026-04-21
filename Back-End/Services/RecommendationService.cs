@@ -37,6 +37,10 @@ public class RecommendationService : IRecommendationService
 
     public async Task<RecommendationGenerateResponse> GenerateAsync(int userId, CancellationToken ct = default)
     {
+        var profileGate = await _db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == userId, ct);
+        if (!HasMinimumCareerIntakeForRecommendations(profileGate))
+            return new RecommendationGenerateResponse(Array.Empty<RecommendationResponse>(), "survey_required");
+
         try
         {
             return await GenerateCoreAsync(userId, ct);
@@ -308,6 +312,15 @@ public class RecommendationService : IRecommendationService
                 LearningPath: null));
         }
         return list;
+    }
+
+    /// <summary>Matches career survey validation: saved profile with interests and skills (non-empty).</summary>
+    private static bool HasMinimumCareerIntakeForRecommendations(UserProfile? profile)
+    {
+        if (profile == null) return false;
+        if (string.IsNullOrWhiteSpace(profile.Interests)) return false;
+        if (string.IsNullOrWhiteSpace(profile.Skills)) return false;
+        return true;
     }
 
     private static string BuildProfileSummary(User? user, UserProfile? p)

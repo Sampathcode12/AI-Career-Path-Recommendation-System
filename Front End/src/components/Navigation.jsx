@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { HomeIcon, UserIcon, ChecklistIcon, TargetIcon, TrendingUpIcon, StarIcon, ChartIcon, LogoutIcon } from './Icons';
 import './Navigation.css';
 
+/** Set to `true` to show the Profile link in the nav again. */
+const SHOW_PROFILE_NAV = false;
+
 const Navigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -24,10 +27,12 @@ const Navigation = () => {
         <HomeIcon size={18} color="currentColor" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
         Home
       </Link>
-      <Link to="/profile" className={isActive('/profile')}>
-        <UserIcon size={18} color="currentColor" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-        Profile
-      </Link>
+      {SHOW_PROFILE_NAV && (
+        <Link to="/profile" className={isActive('/profile')}>
+          <UserIcon size={18} color="currentColor" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+          Profile
+        </Link>
+      )}
       <Link to="/career-survey" className={isActive('/career-survey')}>
         <ChecklistIcon size={18} color="currentColor" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
         Career survey

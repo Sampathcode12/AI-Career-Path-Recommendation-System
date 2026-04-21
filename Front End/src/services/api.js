@@ -11,6 +11,25 @@ function resolveApiBaseUrl() {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+function isLikelyNetworkFailure(error) {
+  if (!error) return false;
+  if (error instanceof TypeError) return true;
+  const msg = String(error.message || '');
+  return msg === 'Failed to fetch' || msg === 'Load failed' || msg === 'NetworkError when attempting to fetch resource.';
+}
+
+/** Turns opaque fetch failures into an actionable message (backend down, wrong port, or proxy target). */
+export function formatApiNetworkError(error) {
+  if (!isLikelyNetworkFailure(error)) return null;
+  const origin = getBackendHintOrigin();
+  return (
+    `Cannot reach the API at ${origin}. ` +
+    `Start the Back-End project (http profile uses port 8000 — see Properties/launchSettings.json). ` +
+    `If it exits immediately, fix startup/database errors first. ` +
+    `With Vite dev, requests go to /api and are proxied; set VITE_DEV_API_PROXY_TARGET in Front End/.env.development if your API uses another URL.`
+  );
+}
+
 /** Shown in user-facing errors. Override with VITE_API_BASE_URL if your API uses another origin/port. */
 export function getBackendHintOrigin() {
   const raw = import.meta.env.VITE_API_BASE_URL;
@@ -126,6 +145,12 @@ async function apiCall(endpoint, options = {}) {
     return await response.json();
   } catch (error) {
     console.error('API Error:', error);
+    const networkMsg = formatApiNetworkError(error);
+    if (networkMsg) {
+      const wrapped = new Error(networkMsg);
+      wrapped.cause = error;
+      throw wrapped;
+    }
     throw error;
   }
 }
@@ -200,14 +225,61 @@ export const jobsAPI = {
     method: 'POST',
     body: filters,
   }),
-  /** cache: no-store avoids stale GET lists when switching category in dev tools / aggressive HTTP caches */
-  getTop: (category, limit = 10) =>
-    apiCall(`/jobs/top?category=${encodeURIComponent(category || '')}&limit=${limit}`, { cache: 'no-store' }),
+  /** Distinct categories from JobListings plus All — Job Search dropdown. */
+  getCategories: () => apiCall('/jobs/categories', { cache: 'no-store' }),
+  /** cache: no-store avoids stale GET lists when switching filters in dev tools / aggressive HTTP caches */
+  getTop: (category, limit = 10, country = '') => {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    const cat = category != null ? String(category).trim() : '';
+    if (cat !== '') params.set('category', cat);
+    const c = country != null ? String(country).trim() : '';
+    if (c !== '') params.set('country', c);
+    return apiCall(`/jobs/top?${params.toString()}`, { cache: 'no-store' });
+  },
   getSaved: () => apiCall('/jobs/saved'),
   save: (jobData) => apiCall('/jobs/save', {
     method: 'POST',
     body: jobData,
   }),
+  /** GET /jobs/role-search — Industry Skill Gap role picker; empty q returns latest listings. */
+  roleSearch: (q, limit = 25) => {
+    const params = new URLSearchParams();
+    const trimmed = q != null ? String(q).trim() : '';
+    if (trimmed) params.set('q', trimmed);
+    if (limit != null) params.set('limit', String(limit));
+    const qs = params.toString();
+    return apiCall(`/jobs/role-search${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
+  },
+  /** GET /jobs/skills-by-level — common posting skills aggregated by inferred Entry / Mid / Senior from titles. */
+  skillsByLevel: (minCount = 1, maxPerLevel = 80) => {
+    const params = new URLSearchParams();
+    params.set('minCount', String(minCount));
+    params.set('maxPerLevel', String(maxPerLevel));
+    return apiCall(`/jobs/skills-by-level?${params.toString()}`, { cache: 'no-store' });
+  },
+  /** GET /jobs/title-suggestions — distinct titles for Job Search autocomplete (scoped by category/country). */
+  titleSuggestions: (q, category = '', country = '', limit = 15) => {
+    const params = new URLSearchParams();
+    const trimmed = q != null ? String(q).trim() : '';
+    if (trimmed) params.set('q', trimmed);
+    const cat = category != null ? String(category).trim() : '';
+    if (cat && cat !== 'All') params.set('category', cat);
+    const c = country != null ? String(country).trim() : '';
+    if (c) params.set('country', c);
+    params.set('limit', String(limit));
+    return apiCall(`/jobs/title-suggestions?${params.toString()}`, { cache: 'no-store' });
+  },
+  /** GET /jobs/role-insights — aggregated salary, growth, skills + industry education/certs for matching title. */
+  roleInsights: (title, category = '', country = '') => {
+    const params = new URLSearchParams();
+    params.set('title', String(title).trim());
+    const cat = category != null ? String(category).trim() : '';
+    if (cat && cat !== 'All') params.set('category', cat);
+    const c = country != null ? String(country).trim() : '';
+    if (c) params.set('country', c);
+    return apiCall(`/jobs/role-insights?${params.toString()}`, { cache: 'no-store' });
+  },
 };
 
 // Colab-trained interest model (Python FastAPI) — proxied through .NET; see ml/HOWTO-USE-MODEL.md

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Doughnut, Line } from 'react-chartjs-2';
-import { TargetIcon, ChecklistIcon, BookIcon, BriefcaseIcon, SearchIcon, TrendingUpIcon, ChartIcon } from '../components/Icons';
+import { TargetIcon, ChecklistIcon, BookIcon, BriefcaseIcon, TrendingUpIcon, ChartIcon } from '../components/Icons';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -29,22 +29,21 @@ ChartJS.register(
   Filler
 );
 
+/** Set to `true` to show the "System Features" card on Home again. */
+const SHOW_SYSTEM_FEATURES_CARD = false;
+
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [profileProgress, setProfileProgress] = useState(45);
-  const [assessmentCompleted, setAssessmentCompleted] = useState(false);
-  useEffect(() => {
-    // Simulate checking profile completion
-    const progress = localStorage.getItem('profileProgress');
-    if (progress) {
-      setProfileProgress(parseInt(progress));
-    }
-    const assessment = localStorage.getItem('assessmentCompleted');
-    if (assessment === 'true') {
-      setAssessmentCompleted(true);
-    }
-  }, []);
+  const [profileProgress] = useState(() => {
+    const raw = localStorage.getItem('profileProgress');
+    if (!raw) return 45;
+    const n = parseInt(raw, 10);
+    return Number.isNaN(n) ? 45 : n;
+  });
+  const [assessmentCompleted] = useState(
+    () => localStorage.getItem('assessmentCompleted') === 'true'
+  );
 
   const handleGetStarted = () => {
     navigate('/profile');
@@ -218,17 +217,18 @@ const Home = () => {
         </div>
       </div>
 
-      {/* System features */}
-      <div className="card">
-        <h3>System Features</h3>
-        <ul style={{ marginBottom: '1rem', paddingLeft: '1.25rem', color: 'var(--text-secondary)' }}>
-          <li><strong style={{ color: 'var(--text)' }}>Real-Time Job Market Analysis</strong> — Market Trends page</li>
-          <li><strong style={{ color: 'var(--text)' }}>Multi-Career Path Exploration</strong> — Recommendation & Top 10 Jobs</li>
-          <li><strong style={{ color: 'var(--text)' }}>Scalable Web-Based System</strong> — React + .NET API</li>
-          <li><strong style={{ color: 'var(--text)' }}>AI-Based Career Recommendation</strong> — Generate personalized careers</li>
-          <li><strong style={{ color: 'var(--text)' }}>Industry Skill Gap Analysis</strong> — Skill Gap page</li>
-        </ul>
-      </div>
+      {SHOW_SYSTEM_FEATURES_CARD && (
+        <div className="card">
+          <h3>System Features</h3>
+          <ul style={{ marginBottom: '1rem', paddingLeft: '1.25rem', color: 'var(--text-secondary)' }}>
+            <li><strong style={{ color: 'var(--text)' }}>Real-Time Job Market Analysis</strong> — Market Trends page</li>
+            <li><strong style={{ color: 'var(--text)' }}>Multi-Career Path Exploration</strong> — Recommendation & Top 10 Jobs</li>
+            <li><strong style={{ color: 'var(--text)' }}>Scalable Web-Based System</strong> — React + .NET API</li>
+            <li><strong style={{ color: 'var(--text)' }}>AI-Based Career Recommendation</strong> — Generate personalized careers</li>
+            <li><strong style={{ color: 'var(--text)' }}>Industry Skill Gap Analysis</strong> — Skill Gap page</li>
+          </ul>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="card">
@@ -240,13 +240,6 @@ const Home = () => {
           >
             <TargetIcon size={32} color="white" />
             <span>View Recommendations</span>
-          </button>
-          <button
-            onClick={() => navigate('/jobsearch')}
-            style={{ padding: '1.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <SearchIcon size={32} color="white" />
-            <span>Search Jobs</span>
           </button>
           <button
             onClick={() => navigate('/dashboard')}

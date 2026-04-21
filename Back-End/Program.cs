@@ -6,8 +6,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using BackEnd.Data;
 using BackEnd.Services;
+using BackEnd.Services.JobListingApiSeed;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Optional overrides (gitignored): put AI:Gemini:ApiKey etc. in appsettings.Development.local.json
+if (builder.Environment.IsDevelopment())
+    builder.Configuration.AddJsonFile("appsettings.Development.local.json", optional: true, reloadOnChange: true);
 
 // JSON: snake_case for frontend compatibility (e.g. access_token)
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -67,6 +72,11 @@ builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 
 builder.Services.Configure<MlSettings>(builder.Configuration.GetSection("ML"));
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient(nameof(ExternalJobListingSeedService), client =>
+{
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("CareerPathRecommendation/1.0 (https://github.com/)");
+});
+builder.Services.AddScoped<IExternalJobListingSeedService, ExternalJobListingSeedService>();
 builder.Services.AddScoped<IMlInterestPredictService, MlInterestPredictService>();
 builder.Services.AddHostedService<FlaskMlAutoStartHostedService>();
 
@@ -184,11 +194,14 @@ using (var scope = app.Services.CreateScope())
     var db = sp.GetRequiredService<ApplicationDbContext>();
     var env = sp.GetRequiredService<IHostEnvironment>();
     var config = sp.GetRequiredService<IConfiguration>();
+    var http = sp.GetRequiredService<IHttpClientFactory>();
+    var jobApi = sp.GetRequiredService<IExternalJobListingSeedService>();
     var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Database");
+    var seedLog = sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataSeeder");
     BackEnd.LocalDbWindowsBootstrap.TryStartIfLocalDb(config, env, log);
     await Task.Delay(750);
     await db.Database.MigrateAsync();
-    await DataSeeder.SeedAsync(db, env);
+    await DataSeeder.SeedAsync(db, env, config, http, jobApi, seedLog);
 }
 
 app.Run();

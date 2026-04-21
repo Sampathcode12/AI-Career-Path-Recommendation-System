@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -10,9 +10,9 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { StarIcon, GlobeIcon, TrendingUpIcon } from '../components/Icons';
+import { StarIcon, GlobeIcon, TrendingUpIcon, SearchIcon } from '../components/Icons';
 import { jobsAPI } from '../services/api';
-import { JOB_CATEGORY_FILTER_OPTIONS } from '../constants/jobIndustry';
+import { plainSummaryFromDescription } from '../utils/jobDescription';
 import './PageStyles.css';
 
 ChartJS.register(
@@ -23,6 +23,9 @@ ChartJS.register(
   Tooltip,
   Legend
 );
+
+/** Top 10 page: job title/skill search + intro card ("Find skills & qualifications for a job"). */
+const SHOW_FIND_SKILLS_QUALIFICATIONS_SECTION = false;
 
 const formatCurrentDateTime = () => {
   const now = new Date();
@@ -410,6 +413,18 @@ const ALL_JOBS_MOCK = [
 
 const previousYear = new Date().getFullYear() - 1;
 
+/** Poll API for latest top jobs (ms). */
+const TOP_JOBS_POLL_MS = 60_000;
+
+function formatLastUpdated(d) {
+  if (!d) return '';
+  try {
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return String(d);
+  }
+}
+
 const matchSearch = (job, term) => {
   if (!term || !term.trim()) return true;
   const t = term.toLowerCase().trim();
@@ -419,11 +434,6 @@ const matchSearch = (job, term) => {
   const inSkill = job.skills.some((s) => s.toLowerCase().includes(t));
   const inDesc = job.description.toLowerCase().includes(t);
   return inTitle || inSector || inCategory || inSkill || inDesc;
-};
-
-const matchCategory = (job, category) => {
-  if (!category || category === 'All') return true;
-  return job.category === category;
 };
 
 const mapApiJob = (j, rank) => ({
@@ -449,31 +459,63 @@ const Top10Jobs = () => {
   const navigate = useNavigate();
   const [currentDateTime, setCurrentDateTime] = useState(() => formatCurrentDateTime());
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedJobIds, setSelectedJobIds] = useState(new Set());
   const [showSkillsPanel, setShowSkillsPanel] = useState(false);
   const [showComparePanel, setShowComparePanel] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const cancelledRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
+  const fetchTopJobs = useCallback(async ({ showFullSpinner } = {}) => {
+    const silent = showFullSpinner === false;
+    if (silent) {
+      setRefreshing(true);
+    } else {
       setLoading(true);
-      try {
-        const data = await jobsAPI.getTop(selectedCategory === 'All' ? '' : selectedCategory, 10);
-        const arr = Array.isArray(data) ? data : [];
-        if (!cancelled) setJobs(arr.map((j, i) => mapApiJob(j, i + 1)));
-      } catch (err) {
-        if (!cancelled) setJobs([]);
-        console.error(err);
-      } finally {
-        if (!cancelled) setLoading(false);
+    }
+    try {
+      const data = await jobsAPI.getTop('', 10);
+      const arr = Array.isArray(data) ? data : [];
+      if (!cancelledRef.current) {
+        setJobs(arr.map((j, i) => mapApiJob(j, i + 1)));
+        setLastUpdated(new Date());
+      }
+    } catch (err) {
+      console.error(err);
+      if (!cancelledRef.current && !silent) {
+        setJobs([]);
+      }
+    } finally {
+      if (!cancelledRef.current) {
+        if (silent) setRefreshing(false);
+        else setLoading(false);
       }
     }
-    load();
-    return () => { cancelled = true; };
-  }, [selectedCategory]);
+  }, []);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+    fetchTopJobs({ showFullSpinner: true });
+
+    const pollId = setInterval(() => {
+      fetchTopJobs({ showFullSpinner: false });
+    }, TOP_JOBS_POLL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTopJobs({ showFullSpinner: false });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      cancelledRef.current = true;
+      clearInterval(pollId);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [fetchTopJobs]);
 
   const filteredJobs = useMemo(
     () => jobs.filter((j) => matchSearch(j, searchTerm)),
@@ -557,13 +599,29 @@ const Top10Jobs = () => {
           </div>
         </div>
         <p className="page-lede">
-          Ranked by salary potential, global demand, growth rate, and work-life balance. Data reflects major markets worldwide.
+          Ranked by salary potential, global demand, growth rate, and work-life balance. Listings load from your database and
+          refresh automatically about every minute and when you return to this tab.
         </p>
-        <div className="job-inline-actions">
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/jobsearch')}>Search Jobs</button>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/recommendation')}>
-            Get My Recommendations
-          </button>
+        <div className="top-jobs-live-row">
+          {lastUpdated && (
+            <p className="jobs-muted top-jobs-live-row__meta" aria-live="polite">
+              Last updated: <strong>{formatLastUpdated(lastUpdated)}</strong>
+              {refreshing ? ' · Updating…' : ''}
+            </p>
+          )}
+          <div className="job-inline-actions top-jobs-live-row__actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={loading || refreshing}
+              onClick={() => fetchTopJobs({ showFullSpinner: false })}
+            >
+              Refresh now
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => navigate('/recommendation')}>
+              Get My Recommendations
+            </button>
+          </div>
         </div>
       </div>
 
@@ -584,42 +642,32 @@ const Top10Jobs = () => {
         </div>
       </div>
 
-      {/* Search for any job */}
-      <div className="card">
-        <h3>Find skills & qualifications for a job</h3>
-        <p className="page-lede">
-          Choose a job category, then search by title or skill (e.g. &quot;driver&quot;, &quot;cricketer&quot;, &quot;nurse&quot;, &quot;developer&quot;). Results are filtered by the selected category. Select one or more jobs to view skills, qualifications, and career path.
-        </p>
-        <div className="job-filter-toolbar">
-          <div className="form-group form-group--toolbar form-group--grow">
-            <label htmlFor="top10-category" className="form-label-compact">Job category</label>
-            <select
-              id="top10-category"
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-            >
-              {JOB_CATEGORY_FILTER_OPTIONS.map((cat) => (
-                <option key={cat} value={cat}>{cat === 'All' ? 'All categories' : cat}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group form-group--toolbar form-group--grow-wide">
-            <label htmlFor="top10-search" className="form-label-compact">Search jobs</label>
-            <div className="job-search-input-row">
-              <input
-                id="top10-search"
-                type="text"
-                placeholder="Job title, sector, or skill..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <button type="button" className="btn btn-secondary" onClick={() => { setSearchTerm(''); setSelectedCategory('All'); }}>
-                Clear filters
-              </button>
+      {SHOW_FIND_SKILLS_QUALIFICATIONS_SECTION && (
+        <div className="card">
+          <h3>Find skills & qualifications for a job</h3>
+          <p className="page-lede">
+            Search by title or skill (e.g. &quot;driver&quot;, &quot;nurse&quot;, &quot;developer&quot;). Select one or more jobs below to view skills,
+            qualifications, and career path.
+          </p>
+          <div className="job-filter-toolbar job-filter-toolbar--single">
+            <div className="form-group form-group--toolbar form-group--grow-wide">
+              <label htmlFor="top10-search" className="form-label-compact">Search jobs</label>
+              <div className="job-search-input-row">
+                <input
+                  id="top10-search"
+                  type="text"
+                  placeholder="Job title, sector, or skill..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <button type="button" className="btn btn-secondary" onClick={() => setSearchTerm('')}>
+                  Clear search
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {selectedJobIds.size > 0 && (
         <div className="card selection-banner">
@@ -769,51 +817,100 @@ const Top10Jobs = () => {
         </div>
       )}
 
-      <div className="card">
-        <h3>
-          {selectedCategory !== 'All' || searchTerm.trim()
-            ? `Jobs: ${selectedCategory !== 'All' ? selectedCategory : 'All'}${searchTerm.trim() ? ` · "${searchTerm.trim()}"` : ''} (${filteredJobs.length})`
-            : `All jobs (${filteredJobs.length}) — choose category or search to filter`}
-        </h3>
+      <div className="card job-search-results" aria-labelledby="top10-jobs-results-heading">
+        <h3 id="top10-jobs-results-heading">Filtered results</h3>
+        <p className="job-search-results__scope" aria-live="polite">
+          {SHOW_FIND_SKILLS_QUALIFICATIONS_SECTION && searchTerm.trim() ? (
+            <>
+              <strong>{filteredJobs.length}</strong> {filteredJobs.length === 1 ? 'role' : 'roles'} matching{' '}
+              <strong>&quot;{searchTerm.trim()}&quot;</strong>
+              {' '}
+              — titles and skills from the Top 10 list; adjust the <strong>search</strong> field above to narrow results.
+            </>
+          ) : (
+            <>
+              <strong>{filteredJobs.length}</strong> {filteredJobs.length === 1 ? 'role' : 'roles'} from the Top 10 list
+              {SHOW_FIND_SKILLS_QUALIFICATIONS_SECTION ? (
+                <>
+                  {' '}
+                  — use the <strong>search</strong> field above to filter by <strong>title</strong> or <strong>skill</strong>.
+                </>
+              ) : null}
+            </>
+          )}
+        </p>
+
         {filteredJobs.length === 0 ? (
-          <p className="jobs-muted">
-            No jobs match the selected category and search. Try &quot;All categories&quot; or different keywords (e.g. driver, cricketer, nurse, developer, teacher).
-          </p>
-        ) : (
-          <div className="jobs-stack jobs-stack--tight-top">
-            {filteredJobs.map((job) => (
-              <div
-                key={job.id}
-                className={`card job-card job-card--selectable${selectedJobIds.has(job.id) ? ' job-card--selected' : ''}`}
-              >
-                <div className="job-select-row">
-                  <label className="job-select-row__check" title="Select to view skills & career path">
-                    <input
-                      type="checkbox"
-                      checked={selectedJobIds.has(job.id)}
-                      onChange={() => toggleJobSelection(job.id)}
-                    />
-                    <span>Select</span>
-                  </label>
-                  <div className="job-select-row__main">
-                    <div className="job-select-row__title-line">
-                      <h4>{job.title}</h4>
-                      <span className="job-pill">{job.sector}</span>
-                      {job.category && (
-                        <span className="job-pill job-pill--category">{job.category}</span>
-                      )}
-                    </div>
-                    <p className="job-select-row__desc">{job.description}</p>
-                    <div className="job-select-row__meta">
-                      <span><strong>Salary:</strong> {job.salary}</span>
-                      <span><strong>Growth:</strong> {job.growth}</span>
-                      <span className="job-select-row__regions">{job.regions}</span>
-                    </div>
-                  </div>
-                  <StarIcon size={20} color="var(--accent)" className="job-select-row__star" />
+          <div className="job-search-results__empty-stack">
+            <div
+              className="card job-card job-search-results__empty-card"
+              role="status"
+              aria-label={SHOW_FIND_SKILLS_QUALIFICATIONS_SECTION ? 'No jobs match this search' : 'No jobs to display'}
+            >
+              <div className="job-search-results__empty-inner">
+                <div className="job-search-results__empty-icon" aria-hidden>
+                  <SearchIcon size={28} color="currentColor" />
                 </div>
+                <p className="job-search-results__empty-kicker">No results found</p>
+                <p className="job-search-results__empty-body">
+                  {SHOW_FIND_SKILLS_QUALIFICATIONS_SECTION ? (
+                    <>
+                      No jobs match your search. Try different keywords (for example <strong>driver</strong>,{' '}
+                      <strong>nurse</strong>, <strong>developer</strong>, or <strong>teacher</strong>), or clear the search to
+                      see all roles again.
+                    </>
+                  ) : (
+                    <>
+                      No roles to display right now. Try <strong>Refresh now</strong> above, or check that the API is running
+                      and returning job listings.
+                    </>
+                  )}
+                </p>
               </div>
-            ))}
+            </div>
+          </div>
+        ) : (
+          <div className="jobs-stack">
+            {filteredJobs.map((job) => {
+              const descSummary = plainSummaryFromDescription(job.description);
+              return (
+                <div
+                  key={job.id}
+                  className={`card job-card job-card--selectable${selectedJobIds.has(job.id) ? ' job-card--selected' : ''}`}
+                >
+                  <div className="job-select-row">
+                    <label className="job-select-row__check" title="Select to view skills & career path">
+                      <input
+                        type="checkbox"
+                        checked={selectedJobIds.has(job.id)}
+                        onChange={() => toggleJobSelection(job.id)}
+                      />
+                      <span>Select</span>
+                    </label>
+                    <div className="job-select-row__main">
+                      <div className="job-select-row__title-line">
+                        <h4>{job.title}</h4>
+                        <span className="job-pill">{job.sector}</span>
+                        {job.category && (
+                          <span className="job-pill job-pill--category">{job.category}</span>
+                        )}
+                      </div>
+                      {descSummary ? (
+                        <p className="job-select-row__desc">{descSummary}</p>
+                      ) : (
+                        <p className="job-select-row__desc jobs-muted">No short summary available.</p>
+                      )}
+                      <div className="job-select-row__meta">
+                        <span><strong>Salary:</strong> {job.salary}</span>
+                        <span><strong>Growth:</strong> {job.growth}</span>
+                        <span className="job-select-row__regions">{job.regions}</span>
+                      </div>
+                    </div>
+                    <StarIcon size={20} color="var(--accent)" className="job-select-row__star" />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

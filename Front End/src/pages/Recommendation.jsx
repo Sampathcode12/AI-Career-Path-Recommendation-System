@@ -5,10 +5,12 @@ import { CheckIcon, ChatIcon } from '../components/Icons';
 import RecommendationChatbot from '../components/RecommendationChatbot';
 import {
   recommendationsAPI,
+  profileAPI,
   getBackendHintOrigin,
   hasCareerProfileNeedsRecommendationRefresh,
   clearCareerProfileNeedsRecommendationRefresh,
 } from '../services/api';
+import { isCareerIntakeComplete } from '../careerIntakeUtils';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -104,7 +106,7 @@ const Recommendation = () => {
   const [pendingAskCareer, setPendingAskCareer] = useState(null);
   /** True when API failed or UI is showing sample / offline template rows. */
   const [usingTemplateRecommendations, setUsingTemplateRecommendations] = useState(false);
-  /** From last generate: ai | template_no_key | template_llm_failed | template_error | template_preview_only | offline | null */
+  /** From last generate: ai | survey_required | template_no_key | template_llm_failed | template_error | template_preview_only | offline | null */
   const [generationSource, setGenerationSource] = useState(null);
   /** From GET /recommendations/ai-setup-status — tells us if Gemini/OpenAI key is configured on the server. */
   const [aiSetupStatus, setAiSetupStatus] = useState(null);
@@ -144,9 +146,11 @@ const Recommendation = () => {
 
     const genList = rows.map(mapApiToCareer);
     const list =
-      genList.length > 0
-        ? genList
-        : SAMPLE_RECOMMENDATIONS.map((c, i) => ({ ...c, id: -(i + 1) }));
+      source === 'survey_required'
+        ? []
+        : genList.length > 0
+          ? genList
+          : SAMPLE_RECOMMENDATIONS.map((c, i) => ({ ...c, id: -(i + 1) }));
 
     const isOfflineSample = list.some((c) => c.id < 0);
     const isNonAiGenerate =
@@ -156,7 +160,11 @@ const Recommendation = () => {
       source === 'template_preview_only';
 
     setGenerationSource(source);
-    setUsingTemplateRecommendations(Boolean(fromApiError || isOfflineSample || isNonAiGenerate));
+    setUsingTemplateRecommendations(
+      source === 'survey_required'
+        ? false
+        : Boolean(fromApiError || isOfflineSample || isNonAiGenerate)
+    );
     setCareers(list);
   }, []);
 
@@ -170,6 +178,21 @@ const Recommendation = () => {
       try {
         await refreshAiSetupStatus();
         if (cancelled) return;
+
+        let profile = null;
+        try {
+          profile = await profileAPI.get();
+        } catch (e) {
+          if (e?.status !== 404) throw e;
+        }
+        if (cancelled) return;
+
+        if (!isCareerIntakeComplete(profile)) {
+          setCareers([]);
+          setGenerationSource('survey_required');
+          setUsingTemplateRecommendations(false);
+          return;
+        }
 
         const savedProfileNeedsRefresh = hasCareerProfileNeedsRecommendationRefresh();
         if (navigationWantsRegenerate || savedProfileNeedsRefresh) {
@@ -209,6 +232,17 @@ const Recommendation = () => {
     setGenerating(true);
     setChatHistory([]);
     try {
+      let profile = null;
+      try {
+        profile = await profileAPI.get();
+      } catch (e) {
+        if (e?.status !== 404) throw e;
+      }
+      if (!isCareerIntakeComplete(profile)) {
+        applyRecommendationList({ recommendations: [], generation_source: 'survey_required' });
+        await refreshAiSetupStatus();
+        return;
+      }
       const data = await recommendationsAPI.generate();
       applyRecommendationList(data);
       clearCareerProfileNeedsRecommendationRefresh();
@@ -385,6 +419,25 @@ const Recommendation = () => {
     <section className="page-section">
       <div className="card">
         <h2>AI-Based Career Recommendation</h2>
+        {generationSource === 'survey_required' && !loading && (
+          <div
+            role="status"
+            style={{
+              marginBottom: '1rem',
+              padding: '0.75rem 1rem',
+              background: 'rgba(59, 130, 246, 0.08)',
+              border: '1px solid rgba(59, 130, 246, 0.28)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.92rem',
+              color: 'var(--text)',
+            }}
+          >
+            <strong>Career survey required.</strong> Save your interests and skills on the{' '}
+            <Link to="/career-survey">career survey</Link> page first — then you can generate personalized recommendations here. Generic
+            template lists are not shown until then.
+          </div>
+        )}
+
         <p className="page-lede" style={{ marginBottom: '1.25rem' }}>
           Recommendations use your saved <Link to="/career-survey">career survey</Link> (interests, skills, certificates, UG fields) and
           skill assessment. When the Python ML service is running (<code style={{ fontSize: '0.85em' }}>ml/career_flask_api</code>{' '}
@@ -507,27 +560,40 @@ const Recommendation = () => {
 
         {careers.length === 0 && !loading && (
           <div style={{ marginBottom: '1.5rem' }}>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              No recommendations yet. Generate AI-powered recommendations based on your profile and assessment.
-            </p>
-            <button
-              className="btn btn-primary"
-              onClick={handleGenerate}
-              disabled={generating}
-            >
-              {generating ? 'Generating...' : 'Generate Recommendations'}
-            </button>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '1rem' }}>
-              Or try sample recommendations to explore the interface:
-            </p>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => applyRecommendationList([], { fromApiError: true })}
-              style={{ marginTop: '0.5rem' }}
-            >
-              Show Sample Recommendations
-            </button>
+            {generationSource === 'survey_required' ? (
+              <>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  No recommendations are shown until your career background (interests and skills) is saved.
+                </p>
+                <Link to="/career-survey" className="btn btn-primary">
+                  Open career survey
+                </Link>
+              </>
+            ) : (
+              <>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  No recommendations yet. Generate AI-powered recommendations based on your profile and assessment.
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleGenerate}
+                  disabled={generating}
+                >
+                  {generating ? 'Generating...' : 'Generate Recommendations'}
+                </button>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '1rem' }}>
+                  Or try sample recommendations to explore the interface:
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => applyRecommendationList([], { fromApiError: true })}
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  Show Sample Recommendations
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -760,31 +826,6 @@ const Recommendation = () => {
           showFloatingButton={true}
         />
       )}
-
-      {/* Similar AI career tools reference */}
-      <div className="card">
-        <h3>Similar AI Career Tools</h3>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-          Other AI-powered systems that match skills with jobs: LinkedIn, Eightfold.ai, FuturU, Jobscan, HiringCafe, Magnet.me, Promilo. Most use resume analysis, skill matching, and job market data.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', fontSize: '0.9rem' }}>
-          <div style={{ padding: '0.75rem', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)' }}>
-            <strong>LinkedIn</strong> — AI job matching, career advice
-          </div>
-          <div style={{ padding: '0.75rem', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)' }}>
-            <strong>Eightfold.ai</strong> — Career paths, skill gaps
-          </div>
-          <div style={{ padding: '0.75rem', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)' }}>
-            <strong>FuturU</strong> — Career fit score, market trends
-          </div>
-          <div style={{ padding: '0.75rem', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)' }}>
-            <strong>Jobscan</strong> — CV vs job description matching
-          </div>
-        </div>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '1rem' }}>
-          For software students: LinkedIn (must-have), Eightfold.ai (career path), Jobscan (CV improvement). Keep GitHub + portfolio updated.
-        </p>
-      </div>
     </section>
   );
 };

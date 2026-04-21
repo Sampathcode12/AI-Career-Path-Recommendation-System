@@ -1,0 +1,20 @@
+[
+  {
+    "category": "Technology",
+    "title": "Job Demand Growth",
+    "description": "Data Science and Software Engineering demand",
+    "trendDataJson": "{\"labels\":[\"2020\",\"2021\",\"2022\",\"2023\",\"2024\"],\"data\":[100,115,130,145,165]}"
+  },
+  {
+    "category": "Healthcare",
+    "title": "Healthcare Hiring",
+    "description": "Nursing and health tech growth",
+    "trendDataJson": "{\"labels\":[\"2020\",\"2021\",\"2022\",\"2023\",\"2024\"],\"data\":[100,108,118,128,140]}"
+  },
+  {
+    "category": "Finance",
+    "title": "Finance Sector",
+    "description": "FinTech and analytics demand",
+    "trendDataJson": "{\"labels\":[\"2020\",\"2021\",\"2022\",\"2023\",\"2024\"],\"data\":[100,105,112,120,130]}"
+  }
+]
