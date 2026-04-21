@@ -1,12 +1,11 @@
-// Dev default: same-origin `/api` → Vite proxy (vite.config.js → VITE_DEV_API_PROXY_TARGET or http://localhost:8000).
-// That matches launchSettings and avoids mixed direct/proxy setups. Override with VITE_API_BASE_URL when needed.
-// Production default: full URL (set VITE_API_BASE_URL in deploy env if the API is elsewhere).
+// Default: same-origin `/api`. In dev, Vite proxies `/api` → VITE_DEV_API_PROXY_TARGET or http://localhost:8000 (vite.config.js).
+// In production (e.g. Vercel), set VITE_API_BASE_URL to your deployed .NET API base (e.g. https://api.example.com/api) and redeploy.
 function resolveApiBaseUrl() {
   const raw = import.meta.env.VITE_API_BASE_URL;
   if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
     return String(raw).replace(/\/$/, '');
   }
-  return import.meta.env.DEV ? '/api' : 'http://localhost:8000/api';
+  return '/api';
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
@@ -21,12 +20,27 @@ function isLikelyNetworkFailure(error) {
 /** Turns opaque fetch failures into an actionable message (backend down, wrong port, or proxy target). */
 export function formatApiNetworkError(error) {
   if (!isLikelyNetworkFailure(error)) return null;
-  const origin = getBackendHintOrigin();
+  if (import.meta.env.DEV) {
+    const origin = getBackendHintOrigin();
+    return (
+      `Cannot reach the API at ${origin}. ` +
+      `Start the Back-End project (http profile uses port 8000 — see Properties/launchSettings.json). ` +
+      `If it exits immediately, fix startup/database errors first. ` +
+      `With Vite dev, requests go to /api and are proxied; set VITE_DEV_API_PROXY_TARGET in Front End/.env.development if your API uses another URL.`
+    );
+  }
+  const base = API_BASE_URL;
+  let display = base;
+  if (!/^https?:\/\//i.test(base)) {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      display = `${window.location.origin}${base.startsWith('/') ? base : `/${base}`}`;
+    }
+  }
   return (
-    `Cannot reach the API at ${origin}. ` +
-    `Start the Back-End project (http profile uses port 8000 — see Properties/launchSettings.json). ` +
-    `If it exits immediately, fix startup/database errors first. ` +
-    `With Vite dev, requests go to /api and are proxied; set VITE_DEV_API_PROXY_TARGET in Front End/.env.development if your API uses another URL.`
+    `Could not reach the API (${display}). ` +
+    `Your .NET API must be deployed to a public URL (localhost is not reachable from the internet). ` +
+    `In Vercel → Project → Settings → Environment Variables, set VITE_API_BASE_URL to that API base URL (include the /api prefix if your routes live under /api), then redeploy. ` +
+    `Ensure the backend allows CORS for this site’s origin.`
   );
 }
 
@@ -48,7 +62,13 @@ export function getBackendHintOrigin() {
       /* fall through */
     }
   }
-  return 'http://localhost:8000';
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8000';
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return 'https://your-deployed-api.example.com';
 }
 
 function parseApiErrorJson(body) {

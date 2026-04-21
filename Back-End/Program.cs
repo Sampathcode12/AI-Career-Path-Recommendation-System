@@ -80,12 +80,22 @@ builder.Services.AddScoped<IExternalJobListingSeedService, ExternalJobListingSee
 builder.Services.AddScoped<IMlInterestPredictService, MlInterestPredictService>();
 builder.Services.AddHostedService<FlaskMlAutoStartHostedService>();
 
-// CORS
+// CORS — localhost for dev; add production front-end URLs via Cors:AllowedOrigins (or env Cors__AllowedOrigins__0=...)
+var localDevOrigins = new[]
+{
+    "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:3000", "http://localhost:8000"
+};
+var extraCorsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?.Where(static s => !string.IsNullOrWhiteSpace(s))
+    .Select(static s => s.Trim())
+    .ToArray() ?? Array.Empty<string>();
+var corsOrigins = localDevOrigins.Concat(extraCorsOrigins).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:3000", "http://localhost:8000")
+        policy.WithOrigins(corsOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
