@@ -1,5 +1,8 @@
 {
   "installCommand": "npm install --prefix \"Front End\"",
   "buildCommand": "npm run build",
-  "outputDirectory": "Front End/dist"
+  "outputDirectory": "Front End/dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

@@ -23,7 +23,7 @@ export function getResolvedApiBaseUrl() {
 }
 
 /**
- * True when this is a production build still using same-origin `/api` on a public host (e.g. Vercel).
+ * True when this is a production build still using same-origin `/api` on a public host.
  * Means VITE_API_BASE_URL / BACKEND_API_BASE_URL was not set at build time — requests hit the static host and 404.
  */
 export function isDeployedWithoutExplicitApiBase() {
@@ -31,8 +31,8 @@ export function isDeployedWithoutExplicitApiBase() {
   if (API_BASE_URL !== '/api') return false;
   if (typeof window === 'undefined') return false;
   const h = window.location.hostname || '';
-  if (h === 'localhost' || h === '127.0.0.1') return false;
-  return /\.vercel\.app$/i.test(h) || h.includes('vercel.app');
+  if (!h || h === 'localhost' || h === '127.0.0.1') return false;
+  return true;
 }
 
 function isLikelyNetworkFailure(error) {
@@ -189,6 +189,16 @@ async function apiCall(endpoint, options = {}) {
         }
       }
       const fromBody = parseApiErrorJson(body);
+
+      // 404 in production with no explicit API base = the static Vercel host has no backend
+      if (response.status === 404 && !fromBody && isDeployedWithoutExplicitApiBase()) {
+        const err = new Error(
+          'Backend API is not reachable. Set VITE_API_BASE_URL in Vercel → Project → Settings → Environment Variables to your deployed .NET API URL (include the /api prefix), then redeploy.'
+        );
+        err.status = 404;
+        throw err;
+      }
+
       const fallback = `${response.status} ${response.statusText || ''}`.trim();
       const err = new Error(fromBody || fallback || 'Request failed');
       err.status = response.status;
