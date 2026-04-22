@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Navigation from './components/Navigation';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
+import { isDeployedWithoutExplicitApiBase } from './services/api';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Home from './pages/Home';
@@ -23,6 +24,14 @@ const AppRoutes = () => {
 
   return (
     <div className="app">
+      {isDeployedWithoutExplicitApiBase() && (
+        <div className="deployment-api-banner" role="alert">
+          <strong>API not configured for this deployment.</strong> Set{' '}
+          <code>VITE_API_BASE_URL</code> (or <code>BACKEND_API_BASE_URL</code>) in Vercel → Settings → Environment
+          Variables to your hosted .NET API base URL including <code>/api</code>, then trigger a new deployment. The
+          .NET app cannot run on Vercel with this static front-end only setup.
+        </div>
+      )}
       {isAuthenticated && (
         <>
           <Header />
