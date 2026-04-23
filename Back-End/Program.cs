@@ -26,19 +26,37 @@ builder.Services.AddControllers().AddJsonOptions(o =>
     o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
 });
 
-// DbContext: connection string "Default" (or "DefaultConnection"). On run, DB is created/updated via migrations.
-var connectionString = builder.Configuration.GetConnectionString("Default")
+// DbContext: connection string "Default" (or "DefaultConnection").
+// Railway/Heroku: DATABASE_URL env var (postgres://user:pass@host:port/db) takes priority.
+// Local dev: SQL Server Express via appsettings.json ConnectionStrings:Default.
+static bool IsPostgresCs(string cs) =>
+    cs.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+    cs.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+    cs.Contains("Host=", StringComparison.OrdinalIgnoreCase);
+
+var connectionString =
+    Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? builder.Configuration.GetConnectionString("Default")
     ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Server=(localdb)\\mssqllocaldb;Database=CareerPathDb;Trusted_Connection=True;MultipleActiveResultSets=true";
+
 var databaseName = builder.Configuration["DatabaseName"];
 if (!string.IsNullOrWhiteSpace(databaseName))
 {
     connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Initial Catalog=[^;]*", "Initial Catalog=" + databaseName, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Database=[^;]*", "Database=" + databaseName, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 }
+
+var usePostgres = IsPostgresCs(connectionString);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString, sql =>
-        sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(3), null)));
+{
+    if (usePostgres)
+        options.UseNpgsql(connectionString, npgsql =>
+            npgsql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(3), null));
+    else
+        options.UseSqlServer(connectionString, sql =>
+            sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(3), null));
+});
 
 // JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "your-256-bit-secret-key-for-signing-tokens!!";
@@ -80,7 +98,8 @@ builder.Services.AddScoped<IExternalJobListingSeedService, ExternalJobListingSee
 builder.Services.AddScoped<IMlInterestPredictService, MlInterestPredictService>();
 builder.Services.AddHostedService<FlaskMlAutoStartHostedService>();
 
-// CORS — localhost for dev; add production front-end URLs via Cors:AllowedOrigins (or env Cors__AllowedOrigins__0=...)
+// CORS — localhost for dev; in Railway set CORS_ORIGIN=https://your-app.vercel.app
+// or Cors__AllowedOrigins__0=https://your-app.vercel.app
 var localDevOrigins = new[]
 {
     "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:3000", "http://localhost:8000"
@@ -89,7 +108,16 @@ var extraCorsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").G
     ?.Where(static s => !string.IsNullOrWhiteSpace(s))
     .Select(static s => s.Trim())
     .ToArray() ?? Array.Empty<string>();
-var corsOrigins = localDevOrigins.Concat(extraCorsOrigins).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+// CORS_ORIGIN env var: simple single-origin override (e.g. set in Railway dashboard)
+var corsOriginEnv = Environment.GetEnvironmentVariable("CORS_ORIGIN");
+var singleEnvOrigins = string.IsNullOrWhiteSpace(corsOriginEnv)
+    ? Array.Empty<string>()
+    : corsOriginEnv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+var corsOrigins = localDevOrigins
+    .Concat(extraCorsOrigins)
+    .Concat(singleEnvOrigins)
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
 
 builder.Services.AddCors(options =>
 {
@@ -197,7 +225,7 @@ app.MapGet("/api/health/db/diagnostics", async (ApplicationDbContext db, Cancell
     }
 }).AllowAnonymous();
 
-// Apply pending migrations and seed data
+// Apply migrations / ensure schema exists
 using (var scope = app.Services.CreateScope())
 {
     var sp = scope.ServiceProvider;
@@ -208,10 +236,24 @@ using (var scope = app.Services.CreateScope())
     var jobApi = sp.GetRequiredService<IExternalJobListingSeedService>();
     var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Database");
     var seedLog = sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataSeeder");
-    BackEnd.LocalDbWindowsBootstrap.TryStartIfLocalDb(config, env, log);
-    await Task.Delay(750);
-    await db.Database.MigrateAsync();
+    if (usePostgres)
+    {
+        // PostgreSQL (Railway): EnsureCreated creates schema from model without SQL Server migrations
+        await db.Database.EnsureCreatedAsync();
+    }
+    else
+    {
+        // SQL Server (local dev): apply EF migrations
+        BackEnd.LocalDbWindowsBootstrap.TryStartIfLocalDb(config, env, log);
+        await Task.Delay(750);
+        await db.Database.MigrateAsync();
+    }
     await DataSeeder.SeedAsync(db, env, config, http, jobApi, seedLog);
 }
 
-app.Run();
+// Listen on Railway's PORT env var (defaults to 8080 in containers, 8000 locally)
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(port))
+    app.Run($"http://+:{port}");
+else
+    app.Run();
