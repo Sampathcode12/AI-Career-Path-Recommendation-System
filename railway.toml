@@ -1,8 +1,7 @@
 [build]
-# Build the .NET backend from the Back-End subfolder
+# Build the .NET backend — Dockerfile copies from Back-End/ relative to repo root
 builder = "DOCKERFILE"
 dockerfilePath = "Back-End/Dockerfile"
-buildContext = "Back-End"
 
 [deploy]
 healthcheckPath = "/api/health/db"
