@@ -1,4 +1,195 @@
-/* Profile page - Education & User Interests sections */
+/* ===== Profile hero card ===== */
+.profile-hero-card {
+  background: linear-gradient(135deg, rgba(13, 115, 119, 0.07) 0%, var(--bg-card) 60%);
+  border: 1px solid rgba(13, 115, 119, 0.25);
+}
+
+.profile-hero-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.profile-hero-avatar {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 14px rgba(13, 115, 119, 0.3);
+}
+
+.profile-hero-info {
+  flex: 1;
+  min-width: 180px;
+}
+
+.profile-hero-name {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.profile-hero-email {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+.profile-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.profile-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.profile-hero-badge--role {
+  background: rgba(13, 115, 119, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(13, 115, 119, 0.3);
+}
+
+.profile-hero-badge--location {
+  background: var(--bg-page);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.profile-hero-badge--link {
+  background: rgba(10, 102, 194, 0.08);
+  color: #0a66c2;
+  border: 1px solid rgba(10, 102, 194, 0.25);
+  cursor: pointer;
+}
+
+.profile-hero-badge--link:hover {
+  background: rgba(10, 102, 194, 0.14);
+}
+
+.profile-hero-bio {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 60ch;
+}
+
+/* Ring progress */
+.profile-hero-completion {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.profile-hero-ring {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+
+.profile-hero-ring-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.profile-hero-ring-bg {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 4;
+}
+
+.profile-hero-ring-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.5s ease;
+}
+
+.profile-hero-ring-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.profile-hero-ring-label {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Skills strip */
+.profile-hero-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.profile-tag--more {
+  background: var(--bg-page);
+  color: var(--text-secondary);
+  border: 1px dashed var(--border);
+}
+
+@media (max-width: 480px) {
+  .profile-hero-avatar {
+    width: 56px;
+    height: 56px;
+    font-size: 1.25rem;
+  }
+
+  .profile-hero-name {
+    font-size: 1.25rem;
+  }
+
+  .profile-hero-completion {
+    order: -1;
+    flex-direction: row;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .profile-hero-ring {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+/* ===== Profile page - Education & User Interests sections ===== */
 .profile-section {
   margin-top: 1.5rem;
   padding: 1.5rem;

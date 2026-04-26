@@ -280,8 +280,74 @@ const Profile = () => {
       </div>
     ) : null;
 
+  const avatarInitials = (() => {
+    const name = formData.fullName || user?.name || '';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    if (parts[0]) return parts[0].slice(0, 2).toUpperCase();
+    return 'U';
+  })();
+
   return (
     <section className="page-section">
+      {/* User info hero card */}
+      {!loading && (user || hasAnyDetail) && (
+        <div className="card profile-hero-card">
+          <div className="profile-hero-inner">
+            <div className="profile-hero-avatar">{avatarInitials}</div>
+            <div className="profile-hero-info">
+              <h2 className="profile-hero-name">{formData.fullName || user?.name || 'Your Name'}</h2>
+              {formData.email && (
+                <p className="profile-hero-email">{formData.email}</p>
+              )}
+              <div className="profile-hero-meta">
+                {formData.currentRole && (
+                  <span className="profile-hero-badge profile-hero-badge--role">{formData.currentRole}</span>
+                )}
+                {formData.location && (
+                  <span className="profile-hero-badge profile-hero-badge--location">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ verticalAlign: 'middle', marginRight: '3px' }}>
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
+                    </svg>
+                    {formData.location}
+                  </span>
+                )}
+                {formData.linkedIn && (
+                  <a href={formData.linkedIn} target="_blank" rel="noopener noreferrer" className="profile-hero-badge profile-hero-badge--link">
+                    LinkedIn
+                  </a>
+                )}
+              </div>
+              {formData.bio && (
+                <p className="profile-hero-bio">{formData.bio}</p>
+              )}
+            </div>
+            <div className="profile-hero-completion">
+              <div className="profile-hero-ring" style={{ '--pct': profileProgress }}>
+                <svg viewBox="0 0 44 44" className="profile-hero-ring-svg">
+                  <circle cx="22" cy="22" r="18" className="profile-hero-ring-bg"/>
+                  <circle cx="22" cy="22" r="18" className="profile-hero-ring-fill"
+                    strokeDasharray={`${profileProgress * 1.131} 113.1`}
+                  />
+                </svg>
+                <span className="profile-hero-ring-pct">{profileProgress}%</span>
+              </div>
+              <p className="profile-hero-ring-label">Profile complete</p>
+            </div>
+          </div>
+          {skillTags.length > 0 && (
+            <div className="profile-hero-skills">
+              {skillTags.slice(0, 8).map((skill, i) => (
+                <span key={i} className="profile-tag">{skill}</span>
+              ))}
+              {skillTags.length > 8 && (
+                <span className="profile-tag profile-tag--more">+{skillTags.length - 8} more</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Profile details summary - shown when data is loaded */}
       {!loading && (user || hasAnyDetail) && (
         <div className="card profile-details-card">
@@ -371,38 +437,6 @@ const Profile = () => {
           )}
         </div>
       )}
-
-      {/* Profile Progress Card */}
-      <div className="card">
-        <h2>Profile Completion</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <span style={{ fontWeight: '500' }}>Complete your profile</span>
-              <span style={{ fontWeight: '600', color: 'var(--accent)' }}>{profileProgress}%</span>
-            </div>
-            <div style={{
-              width: '100%',
-              height: '12px',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '6px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                width: `${profileProgress}%`,
-                height: '100%',
-                background: 'var(--accent)',
-                transition: 'width 0.3s ease'
-              }}></div>
-            </div>
-            <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-              {profileProgress < 50 && 'Complete more fields to unlock better recommendations'}
-              {profileProgress >= 50 && profileProgress < 100 && 'Great progress! Keep going!'}
-              {profileProgress === 100 && 'Profile complete! You\'re all set!'}
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Main Profile Form */}
       <div className="card">
