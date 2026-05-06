@@ -57,7 +57,6 @@ const RecommendationChatbot = ({
               <span className="recommendation-chatbot-avatar">AI</span>
               <div>
                 <strong>Career Advisor</strong>
-                <span className="recommendation-chatbot-subtitle">Multi-turn chat — continue like ChatGPT / Gemini</span>
               </div>
             </div>
             <div className="recommendation-chatbot-header-actions">

@@ -12,6 +12,12 @@ import {
 import CareerIntakeFormFields from '../components/CareerIntakeFormFields';
 import './PageStyles.css';
 
+/** Set true to show the “Two different services” note with Flask / docs paths under ML preview. */
+const SHOW_CAREER_SURVEY_TECH_BLURB = false;
+
+/** Set true to show “Preview interest category (ML)” and its result / error UI. */
+const SHOW_ML_PREVIEW_BUTTON = false;
+
 /**
  * Single place to enter career background (survey) data — used by Home, Recommendations, and Assessment flows.
  */
@@ -228,17 +234,19 @@ const CareerSurvey = () => {
               >
                 Save &amp; view recommendations
               </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={savingIntake || mlLoading || profileFormLoading}
-                onClick={handleMlPredict}
-                title="Uses your Colab model via Python API — see ml/HOWTO-USE-MODEL.md"
-              >
-                {mlLoading ? 'Predicting…' : 'Preview interest category (ML)'}
-              </button>
+              {SHOW_ML_PREVIEW_BUTTON && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={savingIntake || mlLoading || profileFormLoading}
+                  onClick={handleMlPredict}
+                  title="Uses your Colab model via Python API — see ml/HOWTO-USE-MODEL.md"
+                >
+                  {mlLoading ? 'Predicting…' : 'Preview interest category (ML)'}
+                </button>
+              )}
             </div>
-            {mlPreview && (
+            {SHOW_ML_PREVIEW_BUTTON && mlPreview && (
               <p
                 className="jobs-muted"
                 style={{
@@ -271,7 +279,7 @@ const CareerSurvey = () => {
                 ) : null}
               </p>
             )}
-            {mlError && (
+            {SHOW_ML_PREVIEW_BUTTON && mlError && (
               <div style={{ marginTop: '0.5rem' }} role="alert">
                 <p className="jobs-muted" style={{ color: 'var(--danger, #b91c1c)', marginBottom: '0.35rem' }}>
                   {mlError}
@@ -288,11 +296,13 @@ const CareerSurvey = () => {
                 )}
               </div>
             )}
-            <p className="jobs-muted" style={{ fontSize: '0.875rem', marginTop: '0.75rem', maxWidth: '42rem' }}>
-              <strong>Two different services:</strong> the <strong>ML preview</strong> button needs the <strong>Flask</strong> Python
-              app (your Colab model). The <strong>Recommendations</strong> page can also use <strong>Gemini / Ollama</strong> for
-              AI-written career lists — optional; see <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>.
-            </p>
+            {SHOW_CAREER_SURVEY_TECH_BLURB && (
+              <p className="jobs-muted" style={{ fontSize: '0.875rem', marginTop: '0.75rem', maxWidth: '42rem' }}>
+                <strong>Two different services:</strong> the <strong>ML preview</strong> button needs the <strong>Flask</strong> Python
+                app (your Colab model). The <strong>Recommendations</strong> page can also use <strong>Gemini / Ollama</strong> for
+                AI-written career lists — optional; see <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>.
+              </p>
+            )}
           </>
         )}
       </div>

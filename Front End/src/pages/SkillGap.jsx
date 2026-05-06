@@ -256,7 +256,7 @@ const SkillGap = () => {
                 id="skill-gap-role-q"
                 type="search"
                 autoComplete="off"
-                placeholder="Job title or company — loaded from API"
+                placeholder=""
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);

@@ -31,6 +31,9 @@ import { buildLocalCareerChatReply } from '../utils/careerChatLocal';
 
 const dbDiagnosticsUrl = () => `${getBackendHintOrigin()}/api/health/db/diagnostics`;
 
+/** Set true to show the intro paragraph with repo paths, config keys, and docs links. */
+const SHOW_RECOMMENDATION_TECH_LEDE = false;
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -413,8 +416,13 @@ const Recommendation = () => {
   /** DB couldn't persist — server returned in-memory template rows (negative ids). Hide if user already has real rows from SQL. */
   const hasPersistedRecommendationRows =
     careers.length > 0 && careers.every((c) => c.id > 0);
+  /** Set true to show the teal SQL / Preview mode banner again. */
+  const SHOW_DB_PREVIEW_BANNER = false;
   const showDbPreviewInfo =
-    generationSource === 'template_preview_only' && !loading && !hasPersistedRecommendationRows;
+    SHOW_DB_PREVIEW_BANNER &&
+    generationSource === 'template_preview_only' &&
+    !loading &&
+    !hasPersistedRecommendationRows;
 
   return (
     <section className="page-section">
@@ -439,17 +447,19 @@ const Recommendation = () => {
           </div>
         )}
 
-        <p className="page-lede" style={{ marginBottom: '1.25rem' }}>
-          Recommendations use your saved <Link to="/career-survey">career survey</Link> (interests, skills, certificates, UG fields) and
-          skill assessment. When the Python ML service is running (<code style={{ fontSize: '0.85em' }}>ml/career_flask_api</code>{' '}
-          or <code style={{ fontSize: '0.85em' }}>ml/predict_api.py</code> +{' '}
-          <code style={{ fontSize: '0.85em' }}>ML:PythonPredictBaseUrl</code> / <code style={{ fontSize: '0.85em' }}>PythonPredictStyle</code>
-          ), that text is sent through your trained model: the predicted career cluster steers the suggested paths (and reorders built-in
-          templates if the AI is unavailable). For cloud LLMs, configure an API key; for a fully local open-source model, set{' '}
-          <code style={{ fontSize: '0.85em' }}>AI:Provider</code> to <code style={{ fontSize: '0.85em' }}>Local</code> and run{' '}
-          <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a> — see{' '}
-          <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>. The chat on this page uses the same provider and your saved recommendation list.
-        </p>
+        {SHOW_RECOMMENDATION_TECH_LEDE && (
+          <p className="page-lede" style={{ marginBottom: '1.25rem' }}>
+            Recommendations use your saved <Link to="/career-survey">career survey</Link> (interests, skills, certificates, UG fields) and
+            skill assessment. When the Python ML service is running (<code style={{ fontSize: '0.85em' }}>ml/career_flask_api</code>{' '}
+            or <code style={{ fontSize: '0.85em' }}>ml/predict_api.py</code> +{' '}
+            <code style={{ fontSize: '0.85em' }}>ML:PythonPredictBaseUrl</code> / <code style={{ fontSize: '0.85em' }}>PythonPredictStyle</code>
+            ), that text is sent through your trained model: the predicted career cluster steers the suggested paths (and reorders built-in
+            templates if the AI is unavailable). For cloud LLMs, configure an API key; for a fully local open-source model, set{' '}
+            <code style={{ fontSize: '0.85em' }}>AI:Provider</code> to <code style={{ fontSize: '0.85em' }}>Local</code> and run{' '}
+            <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a> — see{' '}
+            <code style={{ fontSize: '0.85em' }}>docs/OPENAI-SETUP.md</code>. The chat on this page uses the same provider and your saved recommendation list.
+          </p>
+        )}
 
         {showConnectAiPanel && (
           <div

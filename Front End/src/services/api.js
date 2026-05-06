@@ -1,8 +1,19 @@
+import { PRODUCTION_API_FALLBACK } from '../config/productionApiFallback.js'
+
 // Dev default: same-origin `/api` → Vite proxy (vite.config.js). Production: vite.config injects __BUILD_API_BASE__ from
-// VITE_API_BASE_URL or BACKEND_API_BASE_URL (Vercel env). If empty, falls back to `/api` (same-origin rewrites only).
+// VITE_API_BASE_URL or BACKEND_API_BASE_URL (Vercel env). Optional: PRODUCTION_API_FALLBACK in productionApiFallback.js.
 function buildTimeApiBase() {
   const b = __BUILD_API_BASE__;
   return b != null && String(b).trim() !== '' ? String(b).replace(/\/$/, '') : '';
+}
+
+function resolveProductionCodeFallback() {
+  if (!import.meta.env.PROD) return ''
+  const raw = typeof PRODUCTION_API_FALLBACK === 'string' ? PRODUCTION_API_FALLBACK.trim() : ''
+  if (!raw) return ''
+  const base = raw.replace(/\/$/, '')
+  if (/\/api$/i.test(base)) return base
+  return `${base}/api`
 }
 
 function resolveApiBaseUrl() {
@@ -12,6 +23,8 @@ function resolveApiBaseUrl() {
   if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
     return String(raw).replace(/\/$/, '');
   }
+  const codeFallback = resolveProductionCodeFallback()
+  if (codeFallback) return codeFallback
   return '/api';
 }
 

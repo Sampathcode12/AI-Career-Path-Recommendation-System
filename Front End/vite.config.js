@@ -28,10 +28,10 @@ export default defineConfig(({ mode }) => {
     !buildApiBase &&
     process.env.VERCEL_SKIP_API_ENV_CHECK !== '1'
   ) {
-    throw new Error(
-      'Vercel build: set VITE_API_BASE_URL or BACKEND_API_BASE_URL to your live .NET API base (include /api), ' +
-        'e.g. https://my-api.azurewebsites.net/api — Vercel → Project → Settings → Environment Variables → Production & Preview, then redeploy. ' +
-        'Optional: VERCEL_SKIP_API_ENV_CHECK=1 only if you proxy /api to the API via vercel.json rewrites.'
+    console.warn(
+      '[vite] Vercel production build: VITE_API_BASE_URL / BACKEND_API_BASE_URL is not set. ' +
+        'The app will call same-origin /api (add vercel.json rewrites to your API, or set those env vars and redeploy). ' +
+        'To silence this warning only when /api is proxied: VERCEL_SKIP_API_ENV_CHECK=1.'
     )
   }
 
