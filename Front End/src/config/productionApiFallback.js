@@ -1,13 +1,15 @@
 /**
- * Use when you cannot set VITE_API_BASE_URL on the host (e.g. Vercel dashboard).
- * Set your public .NET API origin here, then redeploy the front end.
+ * Easiest way to point the deployed React app at your .NET API without Vercel env vars:
  *
- * Examples (no trailing slash):
+ * 1) Publish your Back-End to a public HTTPS URL (e.g. Azure App Service — free tier is enough).
+ * 2) On that API, enable CORS for your Vercel site origin (e.g. https://your-project.vercel.app).
+ * 3) Put the API host below (no trailing slash). Routes are expected under /api like locally.
+ *
+ * Examples:
  *   https://my-api.azurewebsites.net
- * If the app already lives under /api on that host, you may set the full base instead:
+ * Or if everything is already under /api on that host:
  *   https://my-api.azurewebsites.net/api
  *
- * Leave '' to use Vite env / same-origin /api only.
- * Your API must allow CORS for this site’s origin when using a full https URL.
+ * Leave '' while developing locally with Vite proxy only.
  */
 export const PRODUCTION_API_FALLBACK = ''

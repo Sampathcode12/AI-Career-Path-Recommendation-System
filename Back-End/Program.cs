@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using BackEnd;
 using BackEnd.Data;
 using BackEnd.Services;
 using BackEnd.Services.JobListingApiSeed;
@@ -39,6 +40,8 @@ var connectionString =
     ?? builder.Configuration.GetConnectionString("Default")
     ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Server=(localdb)\\mssqllocaldb;Database=CareerPathDb;Trusted_Connection=True;MultipleActiveResultSets=true";
+
+connectionString = PostgresUrlNormalizer.NormalizeIfPostgresUri(connectionString);
 
 var databaseName = builder.Configuration["DatabaseName"];
 if (!string.IsNullOrWhiteSpace(databaseName))
@@ -248,6 +251,7 @@ using (var scope = app.Services.CreateScope())
         await Task.Delay(750);
         await db.Database.MigrateAsync();
     }
+    db.Database.SetCommandTimeout(TimeSpan.FromMinutes(5));
     await DataSeeder.SeedAsync(db, env, config, http, jobApi, seedLog);
 }
 

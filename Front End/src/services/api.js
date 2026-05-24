@@ -37,7 +37,7 @@ export function getResolvedApiBaseUrl() {
 
 /**
  * True when this is a production build still using same-origin `/api` on a public host.
- * Means VITE_API_BASE_URL / BACKEND_API_BASE_URL was not set at build time — requests hit the static host and 404.
+ * Means no build-time URL, no VITE_API_BASE_URL at build, and no PRODUCTION_API_FALLBACK — requests hit the static host and 404.
  */
 export function isDeployedWithoutExplicitApiBase() {
   if (!import.meta.env.PROD) return false;
@@ -46,6 +46,16 @@ export function isDeployedWithoutExplicitApiBase() {
   const h = window.location.hostname || '';
   if (!h || h === 'localhost' || h === '127.0.0.1') return false;
   return true;
+}
+
+/** Short instructions for connecting a hosted .NET API (no Vercel env vars required). */
+export function getProductionApiSetupHint() {
+  return (
+    'Host your .NET API on a public URL (e.g. Azure App Service free tier), then in the repo open ' +
+    'Front End/src/config/productionApiFallback.js and set PRODUCTION_API_FALLBACK to that origin ' +
+    '(example: https://your-api.azurewebsites.net). Commit and push so Vercel rebuilds. ' +
+    'Allow CORS on the API for this site’s origin. Alternatively set VITE_API_BASE_URL in Vercel Environment Variables.'
+  );
 }
 
 function isLikelyNetworkFailure(error) {
@@ -77,7 +87,7 @@ export function formatApiNetworkError(error) {
   return (
     `Could not reach the API (${display}). ` +
     `Your .NET API must be deployed to a public URL (localhost is not reachable from the internet). ` +
-    `In Vercel → Project → Settings → Environment Variables, set VITE_API_BASE_URL to that API base URL (include the /api prefix if your routes live under /api), then redeploy. ` +
+    `Set Front End/src/config/productionApiFallback.js → PRODUCTION_API_FALLBACK, or set VITE_API_BASE_URL on the host, then redeploy. ` +
     `Ensure the backend allows CORS for this site’s origin.`
   );
 }
@@ -206,7 +216,7 @@ async function apiCall(endpoint, options = {}) {
       // 404 in production with no explicit API base = the static Vercel host has no backend
       if (response.status === 404 && !fromBody && isDeployedWithoutExplicitApiBase()) {
         const err = new Error(
-          'Backend API is not reachable. Set VITE_API_BASE_URL in Vercel → Project → Settings → Environment Variables to your deployed .NET API URL (include the /api prefix), then redeploy.'
+          `Backend API is not reachable from this static host. ${getProductionApiSetupHint()}`
         );
         err.status = 404;
         throw err;

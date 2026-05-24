@@ -21,13 +21,29 @@ public static class DataSeeder
     };
 
     /// <summary>Sets <see cref="JobListing.Country"/> from <see cref="JobListing.Location"/> when not already stored.</summary>
-    private static async Task BackfillJobListingCountriesAsync(ApplicationDbContext db, CancellationToken ct)
+    private static async Task BackfillJobListingCountriesAsync(ApplicationDbContext db, ILogger logger, CancellationToken ct)
     {
-        var rows = await db.JobListings.Where(j => j.Country == null || j.Country == "").ToListAsync(ct);
-        if (rows.Count == 0) return;
-        foreach (var j in rows)
-            j.Country = JobLocationCountryResolver.Resolve(j.Location);
-        await db.SaveChangesAsync(ct);
+        const int batchSize = 250;
+        var total = 0;
+        while (true)
+        {
+            var rows = await db.JobListings
+                .Where(j => j.Country == null || j.Country == "")
+                .OrderBy(j => j.Id)
+                .Take(batchSize)
+                .ToListAsync(ct);
+            if (rows.Count == 0) break;
+
+            foreach (var j in rows)
+                j.Country = JobLocationCountryResolver.Resolve(j.Location);
+
+            await db.SaveChangesAsync(ct);
+            db.ChangeTracker.Clear();
+            total += rows.Count;
+        }
+
+        if (total > 0)
+            logger.LogInformation("Backfilled Country on {Count} job listing row(s)", total);
     }
 
     private static async Task SeedIndustrySkillGapsAsync(
@@ -296,6 +312,12 @@ public static class DataSeeder
         ILogger logger,
         CancellationToken ct = default)
     {
+        if (!config.GetValue("Seed:RunOnStartup", true))
+        {
+            logger.LogInformation("Seed:RunOnStartup is false — skipping database seed");
+            return;
+        }
+
         await SeedIndustrySkillGapsAsync(db, env, config, http, logger, ct).ConfigureAwait(false);
 
         await SeedJobListingsFromApisAsync(db, jobApi, ct).ConfigureAwait(false);
@@ -314,7 +336,7 @@ public static class DataSeeder
 
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        await BackfillJobListingCountriesAsync(db, ct).ConfigureAwait(false);
+        await BackfillJobListingCountriesAsync(db, logger, ct).ConfigureAwait(false);
 
         if (env.IsDevelopment())
         {
