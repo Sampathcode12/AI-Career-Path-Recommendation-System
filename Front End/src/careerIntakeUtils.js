@@ -125,11 +125,22 @@ export function normalizeRecFormIntakeFields(form) {
   };
 }
 
-/** True when saved profile has the same minimum fields required to submit the career survey (interests + skills). */
+/** True when saved profile has the same minimum fields required to submit the career survey (subject + interests + skills). */
 export function isCareerIntakeComplete(profileSnap) {
-  if (!profileSnap || typeof profileSnap !== 'object') return false;
+  return getCareerIntakeMissingFields(profileSnap).length === 0;
+}
+
+/** Labels for fields still missing from a saved profile (empty = complete). */
+export function getCareerIntakeMissingFields(profileSnap) {
+  if (!profileSnap || typeof profileSnap !== 'object') {
+    return ['UG specialization (major subject)', 'career interest path', 'skills'];
+  }
   const f = mapProfileToRecForm(profileSnap, { name: '' });
-  return Boolean(f.interests?.trim()) && Boolean(f.skillsText?.trim());
+  const missing = [];
+  if (!f.ugSpecialization?.trim()) missing.push('UG specialization (major subject)');
+  if (!f.interests?.trim()) missing.push('career interest path');
+  if (!f.skillsText?.trim()) missing.push('skills');
+  return missing;
 }
 
 export function mapProfileToRecForm(profile, user) {
@@ -158,7 +169,7 @@ export function mapProfileToRecForm(profile, user) {
 }
 
 /**
- * Body for POST/PUT /api/profile — must use camelCase for ASP.NET default JSON binding.
+ * Body for POST/PUT /api/profile — snake_case keys to match ASP.NET JsonNamingPolicy.SnakeCaseLower.
  */
 export function buildProfilePayloadFromRecForm(form, snapshot) {
   const base = snapshot || {};
@@ -166,24 +177,24 @@ export function buildProfilePayloadFromRecForm(form, snapshot) {
 
   const skillsStr = form.skillsText?.trim() || null;
   return {
-    displayName: form.displayName?.trim() || null,
+    display_name: form.displayName?.trim() || null,
     skills: skillsStr ?? b('skills', 'skills') ?? null,
     interests: form.interests?.trim() || null,
-    experienceLevel: b('experience_level', 'experienceLevel') ?? null,
+    experience_level: b('experience_level', 'experienceLevel') ?? null,
     education: b('education', 'education') ?? null,
-    preferredIndustries: b('preferred_industries', 'preferredIndustries') ?? null,
+    preferred_industries: b('preferred_industries', 'preferredIndustries') ?? null,
     location: b('location', 'location') ?? null,
     bio: b('bio', 'bio') ?? null,
-    linkedInUrl: b('linked_in_url', 'linkedInUrl') ?? null,
-    portfolioUrl: b('portfolio_url', 'portfolioUrl') ?? null,
+    linked_in_url: b('linked_in_url', 'linkedInUrl') ?? null,
+    portfolio_url: b('portfolio_url', 'portfolioUrl') ?? null,
     gender: form.gender?.trim() || null,
-    ugCourse: form.ugCourse?.trim() || null,
-    ugSpecialization: form.ugSpecialization?.trim() || null,
-    ugCgpaOrPercentage: form.ugCgpaOrPercentage?.trim() || null,
-    hasAdditionalCertifications: parseYesNo(form.hasCertsText),
-    certificateCourseTitles: form.certTitles?.trim() || null,
-    isWorking: parseYesNo(form.isWorkingText),
-    firstJobTitle: form.firstJobTitle?.trim() || null,
-    mastersField: form.mastersField?.trim() || null,
+    ug_course: form.ugCourse?.trim() || null,
+    ug_specialization: form.ugSpecialization?.trim() || null,
+    ug_cgpa_or_percentage: form.ugCgpaOrPercentage?.trim() || null,
+    has_additional_certifications: parseYesNo(form.hasCertsText),
+    certificate_course_titles: form.certTitles?.trim() || null,
+    is_working: parseYesNo(form.isWorkingText),
+    first_job_title: form.firstJobTitle?.trim() || null,
+    masters_field: form.mastersField?.trim() || null,
   };
 }

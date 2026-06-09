@@ -19,8 +19,10 @@ public class OpenAIService : IOpenAIService
     };
 
     private readonly HttpClient _http;
+    private readonly ILogger<OpenAIService> _logger;
     private readonly bool _llmAvailable;
     private readonly bool _isLocal;
+    private readonly bool _isGemini;
     private readonly string _model;
     private readonly string _provider;
 
@@ -30,9 +32,10 @@ public class OpenAIService : IOpenAIService
 
     public string ConfiguredModel => _model;
 
-    public OpenAIService(HttpClient http, IConfiguration config)
+    public OpenAIService(HttpClient http, IConfiguration config, ILogger<OpenAIService> logger)
     {
         _http = http;
+        _logger = logger;
 
         _provider = (config["AI:Provider"] ?? "Gemini").Trim();
         var section = $"AI:{_provider}";
@@ -49,7 +52,7 @@ public class OpenAIService : IOpenAIService
         _model = config[$"{section}:Model"]
             ?? _provider switch
             {
-                "Gemini" => "gemini-2.0-flash",
+                "Gemini" => "gemini-2.5-flash",
                 "Groq"   => "llama-3.3-70b-versatile",
                 "Local"  => "llama3.2",
                 _        => "gpt-4o-mini"
@@ -71,6 +74,7 @@ public class OpenAIService : IOpenAIService
         }
 
         _isLocal = _provider.Equals("Local", StringComparison.OrdinalIgnoreCase);
+        _isGemini = _provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase);
         _llmAvailable = _isLocal || !string.IsNullOrWhiteSpace(apiKey);
 
         _http.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
@@ -78,13 +82,14 @@ public class OpenAIService : IOpenAIService
             _http.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
     }
 
-    public async Task<IReadOnlyList<AICareerSuggestion>?> GenerateRecommendationsAsync(
+    public async Task<LlmCallResult<IReadOnlyList<AICareerSuggestion>>> GenerateRecommendationsAsync(
         string profileSummary,
         string assessmentSummary,
         CancellationToken ct = default,
         string? surveyMlHint = null)
     {
-        if (!_llmAvailable) return null;
+        if (!_llmAvailable)
+            return LlmCallResult<IReadOnlyList<AICareerSuggestion>>.Fail("No LLM API key configured.");
 
         var mlBlock = string.IsNullOrWhiteSpace(surveyMlHint)
             ? ""
@@ -102,29 +107,66 @@ Profile:
 Assessment:
 {assessmentSummary}
 
-Respond with a JSON array of objects. Each object must have: title, description, category, matchPercentage (1-100), salaryRange (e.g. ""$80k - $120k"" or a realistic range for their region if inferable), growth (e.g. ""+15%""), skills (array of strings), learningPath (array of objects with step, title, duration).
-Example: [{{""title"":""Data Scientist"",""description"":""..."",""category"":""Technology"",""matchPercentage"":87,""salaryRange"":""$95k - $140k"",""growth"":""+18%"",""skills"":[""Python"",""ML""],""learningPath"":[{{""step"":1,""title"":""Learn Python"",""duration"":""2-3 months""}}]}}]
+Respond with a JSON object: {{""careers"":[...]}} where each career object has: title, description, category, matchPercentage (1-100), salaryRange (e.g. ""$80k - $120k"" or a realistic range for their region if inferable), growth (e.g. ""+15%""), skills (array of strings), learningPath (array of objects with step, title, duration).
+Example: {{""careers"":[{{""title"":""Data Scientist"",""description"":""..."",""category"":""Technology"",""matchPercentage"":87,""salaryRange"":""$95k - $140k"",""growth"":""+18%"",""skills"":[""Python"",""ML""],""learningPath"":[{{""step"":1,""title"":""Learn Python"",""duration"":""2-3 months""}}]}}]}}
 Return only valid JSON, no markdown or extra text.";
 
-        try
+        var messages = new[] { new { role = "user", content = prompt } };
+        string? lastError = null;
+        int? lastStatus = null;
+
+        foreach (var model in GetModelCandidates())
         {
-            var body = BuildRequestBody(new[] { new { role = "user", content = prompt } });
-            var response = await _http.PostAsJsonAsync("chat/completions", body, ct);
-            response.EnsureSuccessStatusCode();
+            var chat = await TryChatCompletionAsync(model, messages, ct);
+            if (chat.IsSuccess)
+            {
+                var json = NormalizeModelJson(chat.Content!);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    lastError = "The model returned no parseable JSON.";
+                    continue;
+                }
 
-            var result = await response.Content.ReadFromJsonAsync<ChatCompletionResponse>(JsonOpts, ct);
-            var raw = result?.Choices?[0]?.Message?.Content;
-            if (string.IsNullOrWhiteSpace(raw)) return null;
+                try
+                {
+                    var parsed = ParseSuggestionList(JsonSerializer.Deserialize<JsonElement>(json));
+                    if (parsed is { Count: > 0 })
+                    {
+                        if (!string.Equals(model, _model, StringComparison.OrdinalIgnoreCase))
+                            _logger.LogInformation("Career generate succeeded with fallback model {Model} (configured: {Configured}).", model, _model);
+                        return LlmCallResult<IReadOnlyList<AICareerSuggestion>>.Ok(parsed);
+                    }
 
-            var json = NormalizeModelJson(raw);
-            if (string.IsNullOrWhiteSpace(json)) return null;
+                    lastError = "The model response did not contain any careers with titles.";
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not parse LLM JSON from model {Model}.", model);
+                    lastError = "The model response was not valid JSON.";
+                }
 
-            return ParseSuggestionList(JsonSerializer.Deserialize<JsonElement>(json));
+                continue;
+            }
+
+            lastError = chat.ErrorMessage;
+            lastStatus = chat.StatusCode;
+
+            if (chat.StatusCode is 401 or 403)
+                break;
+
+            if (chat.StatusCode is not (404 or 429))
+                break;
         }
-        catch
-        {
-            return null;
-        }
+
+        _logger.LogWarning(
+            "Career generate LLM failed ({Provider}/{Model}): {Error}",
+            _provider,
+            _model,
+            lastError ?? "unknown error");
+
+        return LlmCallResult<IReadOnlyList<AICareerSuggestion>>.Fail(
+            lastError ?? "The LLM call failed.",
+            lastStatus);
     }
 
     public async Task<string?> ChatAsync(
@@ -151,21 +193,135 @@ Recommended careers:
                 if (m != null) messages.Add(m);
             messages.Add(new { role = "user", content = userMessage ?? "" });
 
-            var body = BuildRequestBody(messages);
-            var response = await _http.PostAsJsonAsync("chat/completions", body, ct);
-            response.EnsureSuccessStatusCode();
+            var chat = await TryChatCompletionAsync(_model, messages, ct);
+            if (chat.IsSuccess)
+                return chat.Content?.Trim();
 
-            var result = await response.Content.ReadFromJsonAsync<ChatCompletionResponse>(JsonOpts, ct);
-            return result?.Choices?[0]?.Message?.Content?.Trim();
+            _logger.LogWarning("Chat LLM failed ({Provider}/{Model}): {Error}", _provider, _model, chat.ErrorMessage);
+            return null;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Chat LLM call threw for {Provider}/{Model}.", _provider, _model);
             return null;
         }
     }
 
-    private object BuildRequestBody(object messages) =>
-        new { model = _model, messages, temperature = 0.7, max_tokens = 2048 };
+    private IEnumerable<string> GetModelCandidates()
+    {
+        yield return _model;
+
+        if (!_isGemini)
+            yield break;
+
+        foreach (var fallback in new[] { "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite" })
+        {
+            if (!string.Equals(fallback, _model, StringComparison.OrdinalIgnoreCase))
+                yield return fallback;
+        }
+    }
+
+    private async Task<ChatCompletionAttempt> TryChatCompletionAsync(
+        string model,
+        IEnumerable<object> messages,
+        CancellationToken ct)
+    {
+        try
+        {
+            var body = BuildRequestBody(model, messages);
+            var response = await _http.PostAsJsonAsync("chat/completions", body, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                var message = ExtractProviderErrorMessage(errorBody)
+                    ?? $"HTTP {(int)response.StatusCode} from {_provider}.";
+
+                _logger.LogWarning(
+                    "LLM HTTP {Status} for model {Model}: {Message}",
+                    (int)response.StatusCode,
+                    model,
+                    message);
+
+                return ChatCompletionAttempt.Fail(message, (int)response.StatusCode);
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<ChatCompletionResponse>(JsonOpts, ct);
+            var raw = result?.Choices?[0]?.Message?.Content;
+            if (string.IsNullOrWhiteSpace(raw))
+                return ChatCompletionAttempt.Fail("The model returned an empty response.");
+
+            return ChatCompletionAttempt.Ok(raw);
+        }
+        catch (HttpRequestException ex)
+        {
+            var hint = _isLocal
+                ? "Could not reach Ollama at localhost:11434 — is it running?"
+                : $"Network error calling {_provider}: {ex.Message}";
+            return ChatCompletionAttempt.Fail(hint);
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return ChatCompletionAttempt.Fail("The LLM request timed out.");
+        }
+        catch (Exception ex)
+        {
+            return ChatCompletionAttempt.Fail(ex.Message);
+        }
+    }
+
+    private static string? ExtractProviderErrorMessage(string errorBody)
+    {
+        if (string.IsNullOrWhiteSpace(errorBody))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(errorBody);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0)
+                root = root[0];
+
+            if (root.TryGetProperty("error", out var err) && err.ValueKind == JsonValueKind.Object)
+            {
+                if (err.TryGetProperty("message", out var msg))
+                {
+                    var text = msg.GetString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(text))
+                        return SanitizeProviderError(text);
+                }
+            }
+        }
+        catch
+        {
+            // ignore parse errors
+        }
+
+        return null;
+    }
+
+    private static string SanitizeProviderError(string message)
+    {
+        var firstLine = message.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault() ?? message;
+
+        if (firstLine.Contains("reported as leaked", StringComparison.OrdinalIgnoreCase))
+            return "Your Gemini API key was disabled (reported as leaked). Create a new key at Google AI Studio and update AI:Gemini:ApiKey.";
+
+        if (firstLine.Contains("quota", StringComparison.OrdinalIgnoreCase)
+            || firstLine.Contains("RESOURCE_EXHAUSTED", StringComparison.OrdinalIgnoreCase))
+            return "Gemini free-tier quota is exhausted for this model. Wait for the limit to reset, switch to AI:Provider Local (Ollama), or use a new API key.";
+
+        if (firstLine.Contains("API key not valid", StringComparison.OrdinalIgnoreCase)
+            || firstLine.Contains("invalid api key", StringComparison.OrdinalIgnoreCase))
+            return "The API key is invalid. Check AI:Gemini:ApiKey or GEMINI_API_KEY in appsettings / environment.";
+
+        return firstLine.Length > 220 ? firstLine[..220] + "…" : firstLine;
+    }
+
+    private static object BuildRequestBody(string model, IEnumerable<object> messages) =>
+        new { model, messages, temperature = 0.7, max_tokens = 2048 };
 
     #region JSON helpers
 
@@ -207,9 +363,9 @@ Recommended careers:
         JsonElement arr;
         if (parsed.ValueKind == JsonValueKind.Array)
             arr = parsed;
-        else if (parsed.TryGetProperty("careers", out var c) && c.ValueKind == JsonValueKind.Array)
+        else if (TryGetProp(parsed, "careers", out var c) && c.ValueKind == JsonValueKind.Array)
             arr = c;
-        else if (parsed.TryGetProperty("recommendations", out var r) && r.ValueKind == JsonValueKind.Array)
+        else if (TryGetProp(parsed, "recommendations", out var r) && r.ValueKind == JsonValueKind.Array)
             arr = r;
         else
             return null;
@@ -227,22 +383,28 @@ Recommended careers:
     {
         try
         {
-            var title = item.GetProperty("title").GetString() ?? "Career";
-            var desc = item.TryGetProperty("description", out var d) ? d.GetString() : null;
-            var cat = item.TryGetProperty("category", out var c) ? c.GetString() : null;
-            var match = item.TryGetProperty("matchPercentage", out var m) && m.TryGetInt32(out var mi) ? mi : (int?)null;
-            var salary = item.TryGetProperty("salaryRange", out var sal) ? sal.GetString() : null;
-            var growth = item.TryGetProperty("growth", out var g) ? g.GetString() : null;
+            if (!TryGetProp(item, "title", out var titleEl))
+                return null;
+
+            var title = titleEl.GetString()?.Trim();
+            if (string.IsNullOrWhiteSpace(title))
+                return null;
+
+            var desc = TryGetProp(item, "description", out var d) ? d.GetString() : null;
+            var cat = TryGetProp(item, "category", out var catEl) ? catEl.GetString() : null;
+            var match = TryGetProp(item, "matchPercentage", out var m) && m.TryGetInt32(out var mi) ? mi : (int?)null;
+            var salary = TryGetProp(item, "salaryRange", out var sal) ? sal.GetString() : null;
+            var growth = TryGetProp(item, "growth", out var g) ? g.GetString() : null;
             var skills = new List<string>();
-            if (item.TryGetProperty("skills", out var sk) && sk.ValueKind == JsonValueKind.Array)
+            if (TryGetProp(item, "skills", out var sk) && sk.ValueKind == JsonValueKind.Array)
                 foreach (var s in sk.EnumerateArray()) skills.Add(s.GetString() ?? "");
             var path = new List<LearningPathStep>();
-            if (item.TryGetProperty("learningPath", out var lp) && lp.ValueKind == JsonValueKind.Array)
+            if (TryGetProp(item, "learningPath", out var lp) && lp.ValueKind == JsonValueKind.Array)
                 foreach (var p in lp.EnumerateArray())
                 {
-                    var step = p.TryGetProperty("step", out var st) && st.TryGetInt32(out var si) ? si : path.Count + 1;
-                    var t = p.TryGetProperty("title", out var pt) ? pt.GetString() ?? "" : "";
-                    var dur = p.TryGetProperty("duration", out var pd) ? pd.GetString() ?? "" : "";
+                    var step = TryGetProp(p, "step", out var st) && st.TryGetInt32(out var si) ? si : path.Count + 1;
+                    var t = TryGetProp(p, "title", out var pt) ? pt.GetString() ?? "" : "";
+                    var dur = TryGetProp(p, "duration", out var pd) ? pd.GetString() ?? "" : "";
                     path.Add(new LearningPathStep(step, t, dur));
                 }
             return new AICareerSuggestion(title, desc ?? "", cat ?? "", match, salary, growth, skills, path);
@@ -250,7 +412,30 @@ Recommended careers:
         catch { return null; }
     }
 
+    private static bool TryGetProp(JsonElement el, string name, out JsonElement value)
+    {
+        foreach (var prop in el.EnumerateObject())
+        {
+            if (prop.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = prop.Value;
+                return true;
+            }
+        }
+        value = default;
+        return false;
+    }
+
     #endregion
+
+    private sealed record ChatCompletionAttempt(string? Content, string? ErrorMessage, int? StatusCode)
+    {
+        public bool IsSuccess => Content != null;
+
+        public static ChatCompletionAttempt Ok(string content) => new(content, null, null);
+
+        public static ChatCompletionAttempt Fail(string message, int? status = null) => new(null, message, status);
+    }
 
     private class ChatCompletionResponse
     {

@@ -258,7 +258,7 @@ export const authAPI = {
 
 // Profile API
 export const profileAPI = {
-  get: () => apiCall('/profile'),
+  get: () => apiCall('/profile', { cache: 'no-store' }),
   create: (data) => apiCall('/profile', {
     method: 'POST',
     body: data,
@@ -392,6 +392,20 @@ export const skillGapAPI = {
 // Market Trends API
 export const marketTrendsAPI = {
   get: () => apiCall('/market-trends'),
+};
+
+// Career survey intake catalog (subjects → career paths from database)
+export const intakeAPI = {
+  /** GET /intake/specializations — majors that have career paths in the catalog. */
+  getSpecializations: () => apiCall('/intake/specializations', { cache: 'no-store' }),
+  /** GET /intake/career-paths — paths for a subject; optional q filters server-side. */
+  getCareerPaths: (specialization, q = '') => {
+    const params = new URLSearchParams();
+    params.set('specialization', String(specialization ?? '').trim());
+    const query = q != null ? String(q).trim() : '';
+    if (query) params.set('q', query);
+    return apiCall(`/intake/career-paths?${params.toString()}`, { cache: 'no-store' });
+  },
 };
 
 

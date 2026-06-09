@@ -11,6 +11,8 @@ export default function SearchableIntakeSelect({
   value,
   setValue,
   otherPlaceholder,
+  searchPlaceholder = 'Search all courses, then pick one…',
+  gridColumn,
 }) {
   const predefinedValues = useMemo(() => options.map((o) => o.value), [options]);
   const selectVal = intakeSelectValue(value, predefinedValues);
@@ -136,7 +138,11 @@ export default function SearchableIntakeSelect({
   const inputDisplay = open ? query : selectedLabel;
 
   return (
-    <div className="form-group searchable-intake-select" ref={rootRef} style={{ gridColumn: '1 / -1' }}>
+    <div
+      className="form-group searchable-intake-select"
+      ref={rootRef}
+      style={gridColumn ? { gridColumn } : { gridColumn: '1 / -1' }}
+    >
       <label htmlFor={id}>{label}</label>
       <div className="searchable-intake-select__wrap">
         <input
@@ -149,7 +155,7 @@ export default function SearchableIntakeSelect({
           aria-autocomplete="list"
           autoComplete="off"
           value={inputDisplay}
-          placeholder="Search all courses, then pick one…"
+          placeholder={searchPlaceholder}
           onFocus={() => {
             setOpen(true);
             setQuery('');

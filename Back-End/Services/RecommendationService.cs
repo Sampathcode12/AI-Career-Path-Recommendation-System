@@ -98,12 +98,13 @@ public class RecommendationService : IRecommendationService
         var assessmentSummary = assessment?.ResultSummary ?? assessment?.AnswersJson ?? "No assessment data yet.";
 
         var mlSignal = await GetMlSurveySignalAsync(profile, ct);
-        var aiRaw = await _openAI.GenerateRecommendationsAsync(
+        var aiResult = await _openAI.GenerateRecommendationsAsync(
             profileSummary,
             assessmentSummary,
             ct,
             mlSignal?.PromptHint);
 
+        var aiRaw = aiResult.Value;
         var validAi = aiRaw?
             .Where(s => s != null && !string.IsNullOrWhiteSpace(s.Title))
             .ToList();
@@ -117,11 +118,12 @@ public class RecommendationService : IRecommendationService
             : !_openAI.IsLlmAvailable
                 ? "template_no_key"
                 : "template_llm_failed";
+        var generationDetail = useAi ? null : aiResult.ErrorMessage;
 
         if (generationSource == "template_no_key")
             _logger.LogWarning("Career generate for user {UserId}: no LLM API key (or Local not used). Using template list. Set AI:Gemini:ApiKey or GEMINI_API_KEY — see docs/OPENAI-SETUP.md.", userId);
         else if (generationSource == "template_llm_failed")
-            _logger.LogWarning("Career generate for user {UserId}: LLM call failed or returned no parseable JSON. Using template list. Check API key, model name, quota, and network.", userId);
+            _logger.LogWarning("Career generate for user {UserId}: LLM call failed or returned no parseable JSON ({Detail}). Using template list.", userId, generationDetail ?? "unknown");
 
         var existing = await _db.CareerRecommendations.Where(x => x.UserId == userId).ToListAsync(ct);
         _db.CareerRecommendations.RemoveRange(existing);
@@ -217,7 +219,7 @@ public class RecommendationService : IRecommendationService
             .OrderBy(x => x.SortOrder)
             .ToListAsync(ct);
         var responses = newList.Select(ToResponse).ToList();
-        return new RecommendationGenerateResponse(responses, generationSource);
+        return new RecommendationGenerateResponse(responses, generationSource, generationDetail);
     }
 
     private async Task<IReadOnlyList<RecommendationResponse>> PersistTemplateRecommendationsAsync(int userId, CancellationToken ct)
@@ -318,6 +320,7 @@ public class RecommendationService : IRecommendationService
     private static bool HasMinimumCareerIntakeForRecommendations(UserProfile? profile)
     {
         if (profile == null) return false;
+        if (string.IsNullOrWhiteSpace(profile.UgSpecialization)) return false;
         if (string.IsNullOrWhiteSpace(profile.Interests)) return false;
         if (string.IsNullOrWhiteSpace(profile.Skills)) return false;
         return true;

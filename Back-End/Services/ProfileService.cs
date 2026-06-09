@@ -86,7 +86,10 @@ public class ProfileService : IProfileService
         profile.MastersField = request.MastersField ?? profile.MastersField;
         profile.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
-        return ToResponse(profile);
+        var reloaded = await _db.UserProfiles.AsNoTracking()
+            .Include(x => x.User)
+            .FirstAsync(x => x.Id == profile.Id, ct);
+        return ToResponse(reloaded);
     }
 
     private static ProfileResponse ToResponse(UserProfile p) =>

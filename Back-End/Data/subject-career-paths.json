@@ -1,0 +1,727 @@
+[
+  {
+    "specialization": "Computer Science / IT",
+    "path_label": "Software development",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Computer Science / IT",
+    "path_label": "Web & mobile applications",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Computer Science / IT",
+    "path_label": "Cloud computing",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Computer Science / IT",
+    "path_label": "Cybersecurity",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Computer Science / IT",
+    "path_label": "Open source & community",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Computer Science / IT",
+    "path_label": "Systems & networks",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Computer Science / IT",
+    "path_label": "Human–computer interaction",
+    "sort_order": 7
+  },
+  {
+    "specialization": "Software Engineering",
+    "path_label": "Building reliable software products",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Software Engineering",
+    "path_label": "Agile & DevOps",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Software Engineering",
+    "path_label": "API design & microservices",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Software Engineering",
+    "path_label": "Testing & quality assurance",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Software Engineering",
+    "path_label": "Performance engineering",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Software Engineering",
+    "path_label": "Technical leadership",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Data Science / AI",
+    "path_label": "Machine learning",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Data Science / AI",
+    "path_label": "Data analysis & visualization",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Data Science / AI",
+    "path_label": "Natural language processing",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Data Science / AI",
+    "path_label": "MLOps & model deployment",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Data Science / AI",
+    "path_label": "Statistics & experimentation",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Data Science / AI",
+    "path_label": "Ethical & responsible AI",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Electronics & Communication",
+    "path_label": "Embedded systems",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Electronics & Communication",
+    "path_label": "IoT & sensors",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Electronics & Communication",
+    "path_label": "Signal processing",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Electronics & Communication",
+    "path_label": "Wireless & RF",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Electronics & Communication",
+    "path_label": "VLSI / chip design",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Electronics & Communication",
+    "path_label": "Robotics hardware",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Electrical Engineering",
+    "path_label": "Power systems & energy",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Electrical Engineering",
+    "path_label": "Control & automation",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Electrical Engineering",
+    "path_label": "Renewable energy",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Electrical Engineering",
+    "path_label": "Electric vehicles",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Electrical Engineering",
+    "path_label": "Smart grids",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Electrical Engineering",
+    "path_label": "Industrial automation",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Mechanical Engineering",
+    "path_label": "Product design & CAD",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Mechanical Engineering",
+    "path_label": "Manufacturing & production",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Mechanical Engineering",
+    "path_label": "Automotive & mobility",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Mechanical Engineering",
+    "path_label": "HVAC & thermal systems",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Mechanical Engineering",
+    "path_label": "Aerospace structures",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Mechanical Engineering",
+    "path_label": "Robotics & mechatronics",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Civil Engineering",
+    "path_label": "Structural design",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Civil Engineering",
+    "path_label": "Transportation & highways",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Civil Engineering",
+    "path_label": "Sustainable construction",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Civil Engineering",
+    "path_label": "Urban planning",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Civil Engineering",
+    "path_label": "Water resources",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Civil Engineering",
+    "path_label": "Project management (infra)",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Information Technology",
+    "path_label": "IT infrastructure",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Information Technology",
+    "path_label": "Enterprise systems",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Information Technology",
+    "path_label": "Database administration",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Information Technology",
+    "path_label": "IT support & operations",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Information Technology",
+    "path_label": "Business analysis",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Information Technology",
+    "path_label": "Digital transformation",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Mathematics",
+    "path_label": "Applied mathematics",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Mathematics",
+    "path_label": "Actuarial & risk",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Mathematics",
+    "path_label": "Operations research",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Mathematics",
+    "path_label": "Teaching & academia",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Mathematics",
+    "path_label": "Mathematical modeling",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Mathematics",
+    "path_label": "Cryptography & theory",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Physics",
+    "path_label": "Research & lab work",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Physics",
+    "path_label": "Medical physics",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Physics",
+    "path_label": "Materials science",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Physics",
+    "path_label": "Astronomy & space",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Physics",
+    "path_label": "Teaching & science communication",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Physics",
+    "path_label": "Data-driven physics",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Chemistry",
+    "path_label": "R&D in industry",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Chemistry",
+    "path_label": "Pharmaceutical chemistry",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Chemistry",
+    "path_label": "Environmental chemistry",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Chemistry",
+    "path_label": "Quality & lab analysis",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Chemistry",
+    "path_label": "Teaching",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Chemistry",
+    "path_label": "Green & sustainable chemistry",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Biotechnology / Life Sciences",
+    "path_label": "Research & development",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Biotechnology / Life Sciences",
+    "path_label": "Biotech industry",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Biotechnology / Life Sciences",
+    "path_label": "Healthcare innovation",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Biotechnology / Life Sciences",
+    "path_label": "Genomics & bioinformatics",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Biotechnology / Life Sciences",
+    "path_label": "Clinical trials support",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Biotechnology / Life Sciences",
+    "path_label": "Agricultural biotech",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Commerce / Accounting",
+    "path_label": "Financial accounting",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Commerce / Accounting",
+    "path_label": "Auditing & assurance",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Commerce / Accounting",
+    "path_label": "Taxation",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Commerce / Accounting",
+    "path_label": "Corporate finance support",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Commerce / Accounting",
+    "path_label": "ERP & systems accounting",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Commerce / Accounting",
+    "path_label": "Startup bookkeeping",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Finance / Banking",
+    "path_label": "Investment analysis",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Finance / Banking",
+    "path_label": "Risk & compliance",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Finance / Banking",
+    "path_label": "Retail & corporate banking",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Finance / Banking",
+    "path_label": "FinTech",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Finance / Banking",
+    "path_label": "Wealth management",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Finance / Banking",
+    "path_label": "Financial modeling",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Marketing",
+    "path_label": "Digital marketing",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Marketing",
+    "path_label": "Brand management",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Marketing",
+    "path_label": "Market research",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Marketing",
+    "path_label": "Content & social media",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Marketing",
+    "path_label": "Growth & performance marketing",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Marketing",
+    "path_label": "Product marketing",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Human Resources",
+    "path_label": "Talent acquisition",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Human Resources",
+    "path_label": "Learning & development",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Human Resources",
+    "path_label": "HR analytics",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Human Resources",
+    "path_label": "Employee relations",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Human Resources",
+    "path_label": "Compensation & benefits",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Human Resources",
+    "path_label": "Organizational development",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Economics",
+    "path_label": "Economic research",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Economics",
+    "path_label": "Public policy",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Economics",
+    "path_label": "Development economics",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Economics",
+    "path_label": "Data analytics for policy",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Economics",
+    "path_label": "Consulting",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Economics",
+    "path_label": "International trade",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Psychology",
+    "path_label": "Clinical & counseling paths",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Psychology",
+    "path_label": "Organizational psychology",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Psychology",
+    "path_label": "Research & academia",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Psychology",
+    "path_label": "UX / human factors",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Psychology",
+    "path_label": "Mental health awareness",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Psychology",
+    "path_label": "Education & training",
+    "sort_order": 6
+  },
+  {
+    "specialization": "English / Literature",
+    "path_label": "Writing & editing",
+    "sort_order": 1
+  },
+  {
+    "specialization": "English / Literature",
+    "path_label": "Publishing",
+    "sort_order": 2
+  },
+  {
+    "specialization": "English / Literature",
+    "path_label": "Teaching & ESL",
+    "sort_order": 3
+  },
+  {
+    "specialization": "English / Literature",
+    "path_label": "Content strategy",
+    "sort_order": 4
+  },
+  {
+    "specialization": "English / Literature",
+    "path_label": "Creative writing",
+    "sort_order": 5
+  },
+  {
+    "specialization": "English / Literature",
+    "path_label": "Communications",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Journalism / Media",
+    "path_label": "News & reporting",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Journalism / Media",
+    "path_label": "Broadcast & video",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Journalism / Media",
+    "path_label": "Documentary",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Journalism / Media",
+    "path_label": "Media production",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Journalism / Media",
+    "path_label": "Public relations",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Journalism / Media",
+    "path_label": "Digital storytelling",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Nursing",
+    "path_label": "Patient care",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Nursing",
+    "path_label": "Community health",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Nursing",
+    "path_label": "Critical care",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Nursing",
+    "path_label": "Public health nursing",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Nursing",
+    "path_label": "Nursing education",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Nursing",
+    "path_label": "Telehealth",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Pharmacy",
+    "path_label": "Clinical pharmacy",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Pharmacy",
+    "path_label": "Pharmaceutical industry",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Pharmacy",
+    "path_label": "Regulatory affairs",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Pharmacy",
+    "path_label": "Community pharmacy",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Pharmacy",
+    "path_label": "Research & development",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Pharmacy",
+    "path_label": "Drug safety",
+    "sort_order": 6
+  },
+  {
+    "specialization": "Law",
+    "path_label": "Corporate law",
+    "sort_order": 1
+  },
+  {
+    "specialization": "Law",
+    "path_label": "Litigation",
+    "sort_order": 2
+  },
+  {
+    "specialization": "Law",
+    "path_label": "Public interest & policy",
+    "sort_order": 3
+  },
+  {
+    "specialization": "Law",
+    "path_label": "Compliance",
+    "sort_order": 4
+  },
+  {
+    "specialization": "Law",
+    "path_label": "Intellectual property",
+    "sort_order": 5
+  },
+  {
+    "specialization": "Law",
+    "path_label": "Legal tech",
+    "sort_order": 6
+  },
+  {
+    "specialization": "General / Undeclared",
+    "path_label": "Exploring multiple career paths",
+    "sort_order": 1
+  },
+  {
+    "specialization": "General / Undeclared",
+    "path_label": "Internships & hands-on experience",
+    "sort_order": 2
+  },
+  {
+    "specialization": "General / Undeclared",
+    "path_label": "Leadership & teamwork",
+    "sort_order": 3
+  },
+  {
+    "specialization": "General / Undeclared",
+    "path_label": "Communication skills",
+    "sort_order": 4
+  },
+  {
+    "specialization": "General / Undeclared",
+    "path_label": "Problem solving",
+    "sort_order": 5
+  },
+  {
+    "specialization": "General / Undeclared",
+    "path_label": "Social impact careers",
+    "sort_order": 6
+  }
+]

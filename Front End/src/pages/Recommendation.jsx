@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Bar, Radar } from 'react-chartjs-2';
 import { CheckIcon, ChatIcon } from '../components/Icons';
@@ -68,6 +68,119 @@ const mapApiToCareer = (r) => ({
   saved: r.saved ?? false,
 });
 
+const buildRadarData = () => ({
+  labels: ['Technical Skills', 'Communication', 'Problem Solving', 'Leadership', 'Creativity', 'Teamwork'],
+  datasets: [
+    {
+      label: 'Your Skills',
+      data: [3.5, 3, 3.5, 2, 2, 3],
+      backgroundColor: 'rgba(13, 115, 119, 0.12)',
+      borderColor: 'rgba(13, 115, 119, 1)',
+      borderWidth: 2,
+    },
+    {
+      label: 'Required Skills',
+      data: [4.5, 3.5, 4, 3, 3.5, 4],
+      backgroundColor: 'rgba(6, 182, 212, 0.2)',
+      borderColor: 'rgba(6, 182, 212, 1)',
+      borderWidth: 2,
+    },
+  ],
+});
+
+function CareerDetailExpand({ career, onAsk, onClose }) {
+  const skills = career.skills?.length ? career.skills : ['Communication', 'Problem solving', 'Teamwork'];
+  const learningPath = career.learningPath?.length
+    ? career.learningPath
+    : [
+        { step: 1, title: 'Build core foundations', duration: '2–3 months' },
+        { step: 2, title: 'Practice role-specific skills', duration: '2–4 months' },
+        { step: 3, title: 'Create portfolio or projects', duration: '2–3 months' },
+        { step: 4, title: 'Apply for entry-level roles', duration: '1–3 months' },
+      ];
+
+  return (
+    <div
+      id="recommendation-detail"
+      className="rec-career-detail"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="rec-career-detail__header">
+        <h4 className="rec-career-detail__heading">More about {career.title}</h4>
+        <div className="rec-career-detail__actions">
+          <button
+            type="button"
+            className="recommendation-detail__ask-btn"
+            onClick={() => onAsk(career.title)}
+          >
+            <ChatIcon size={16} color="currentColor" />
+            Ask about this career
+          </button>
+          <button type="button" className="recommendation-detail__close-btn" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+
+      {career.description ? (
+        <p className="rec-career-detail__full-desc">{career.description}</p>
+      ) : null}
+
+      <div className="recommendation-detail__grid">
+        <div>
+          <h5>Required Skills</h5>
+          <div className="recommendation-detail__skills">
+            {skills.map((skill, index) => (
+              <span key={index} className="recommendation-detail__skill-tag">
+                {skill}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h5>Requirements</h5>
+          <p><strong>Education:</strong> {career.requirements?.education ?? "Bachelor's or related"}</p>
+          <p><strong>Experience:</strong> {career.requirements?.experience ?? '1–5 years'}</p>
+          <p><strong>Salary:</strong> {career.salary}</p>
+          {career.growth ? <p><strong>Growth:</strong> {career.growth}</p> : null}
+        </div>
+      </div>
+
+      <div className="recommendation-detail__learning">
+        <h5>Recommended Learning Path</h5>
+        <div className="recommendation-detail__steps">
+          {learningPath.map((step, index) => (
+            <div key={step.step ?? index} className="recommendation-detail__step">
+              <div className="recommendation-detail__step-num">{step.step ?? index + 1}</div>
+              <div className="recommendation-detail__step-body">
+                <div className="recommendation-detail__step-title">{step.title}</div>
+                <div className="recommendation-detail__step-duration">
+                  Duration: {step.duration || '—'}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="recommendation-detail__radar">
+        <h5>Skill Gap Analysis</h5>
+        <div className="recommendation-detail__radar-chart">
+          <Radar
+            data={buildRadarData()}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'top' } },
+              scales: { r: { beginAtZero: true, max: 5, ticks: { stepSize: 1 } } },
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const resolvedApiBase = getResolvedApiBaseUrl();
 const API_BASE_HINT = resolvedApiBase.startsWith('http')
   ? resolvedApiBase
@@ -76,16 +189,18 @@ const API_BASE_HINT = resolvedApiBase.startsWith('http')
 /** POST /generate returns { recommendations, generation_source } or (legacy) a bare array. */
 function parseGenerateResponse(data) {
   if (Array.isArray(data)) {
-    return { rows: data, generationSource: null };
+    return { rows: data, generationSource: null, generationDetail: null };
   }
   if (data && typeof data === 'object') {
     const rows =
       data.recommendations ?? data.Recommendations ?? data.items ?? data.Items ?? [];
     const generationSource =
       data.generation_source ?? data.generationSource ?? data.GenerationSource ?? null;
-    return { rows: Array.isArray(rows) ? rows : [], generationSource };
+    const generationDetail =
+      data.generation_detail ?? data.generationDetail ?? data.GenerationDetail ?? null;
+    return { rows: Array.isArray(rows) ? rows : [], generationSource, generationDetail };
   }
-  return { rows: [], generationSource: null };
+  return { rows: [], generationSource: null, generationDetail: null };
 }
 
 const SAMPLE_RECOMMENDATIONS = [
@@ -112,9 +227,12 @@ const Recommendation = () => {
   const [usingTemplateRecommendations, setUsingTemplateRecommendations] = useState(false);
   /** From last generate: ai | survey_required | template_no_key | template_llm_failed | template_error | template_preview_only | offline | null */
   const [generationSource, setGenerationSource] = useState(null);
+  /** Human-readable LLM failure reason when generation_source is template_llm_failed. */
+  const [generationDetail, setGenerationDetail] = useState(null);
   /** From GET /recommendations/ai-setup-status — tells us if Gemini/OpenAI key is configured on the server. */
   const [aiSetupStatus, setAiSetupStatus] = useState(null);
   const [aiSetupLoaded, setAiSetupLoaded] = useState(false);
+  const cardRefs = useRef({});
 
   const refreshAiSetupStatus = useCallback(async () => {
     try {
@@ -135,17 +253,21 @@ const Recommendation = () => {
     const fromApiError = options.fromApiError === true;
     let rows;
     let source;
+    let detail;
 
     if (fromApiError) {
       rows = [];
       source = 'offline';
+      detail = null;
     } else if (Array.isArray(payload)) {
       rows = payload;
       source = options.generationSource ?? null;
+      detail = options.generationDetail ?? null;
     } else {
       const parsed = parseGenerateResponse(payload);
       rows = parsed.rows;
       source = parsed.generationSource ?? options.generationSource ?? null;
+      detail = parsed.generationDetail ?? options.generationDetail ?? null;
     }
 
     const genList = rows.map(mapApiToCareer);
@@ -164,6 +286,7 @@ const Recommendation = () => {
       source === 'template_preview_only';
 
     setGenerationSource(source);
+    setGenerationDetail(detail);
     setUsingTemplateRecommendations(
       source === 'survey_required'
         ? false
@@ -178,6 +301,7 @@ const Recommendation = () => {
       setLoading(true);
       setUsingTemplateRecommendations(false);
       setGenerationSource(null);
+      setGenerationDetail(null);
       setAiSetupLoaded(false);
       try {
         await refreshAiSetupStatus();
@@ -212,6 +336,7 @@ const Recommendation = () => {
           if (list.length > 0) {
             setCareers(list);
             setGenerationSource(null);
+            setGenerationDetail(null);
             setUsingTemplateRecommendations(list.some((c) => c.id < 0));
           } else {
             const gen = await recommendationsAPI.generate();
@@ -271,6 +396,26 @@ const Recommendation = () => {
       console.error(err);
     }
   };
+
+  const selectCareer = (career) => {
+    setSelectedCareer((prev) => {
+      const next = prev?.id === career.id ? null : career;
+      if (next) {
+        window.setTimeout(() => {
+          cardRefs.current[career.id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 80);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    setSelectedCareer((prev) => {
+      if (!prev) return null;
+      const fresh = careers.find((c) => c.id === prev.id);
+      return fresh ?? null;
+    });
+  }, [careers]);
 
   const askAboutCareer = (careerTitle) => {
     setChatOpen(true);
@@ -367,28 +512,6 @@ const Recommendation = () => {
     ],
   };
 
-  const radarData = selectedCareer
-    ? {
-        labels: ['Technical Skills', 'Communication', 'Problem Solving', 'Leadership', 'Creativity', 'Teamwork'],
-        datasets: [
-          {
-            label: 'Your Skills',
-            data: [3.5, 3, 3.5, 2, 2, 3],
-            backgroundColor: 'rgba(13, 115, 119, 0.12)',
-            borderColor: 'rgba(13, 115, 119, 1)',
-            borderWidth: 2,
-          },
-          {
-            label: 'Required Skills',
-            data: [4.5, 3.5, 4, 3, 3.5, 4],
-            backgroundColor: 'rgba(6, 182, 212, 0.2)',
-            borderColor: 'rgba(6, 182, 212, 1)',
-            borderWidth: 2,
-          },
-        ],
-      }
-    : null;
-
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -406,11 +529,12 @@ const Recommendation = () => {
   const showConnectAiPanel =
     aiSetupLoaded && aiSetupStatus && !aiSetupStatus.llmConfigured;
 
-  /** Orange strip: not for normal no-key flow or DB preview-only (those use teal info). */
+  /** Orange strip: not for no-key, LLM-failed, or DB preview-only flows. */
   const showOrangeTemplateBanner =
     usingTemplateRecommendations &&
     !loading &&
     generationSource !== 'template_no_key' &&
+    generationSource !== 'template_llm_failed' &&
     generationSource !== 'template_preview_only';
 
   /** DB couldn't persist — server returned in-memory template rows (negative ids). Hide if user already has real rows from SQL. */
@@ -441,7 +565,7 @@ const Recommendation = () => {
               color: 'var(--text)',
             }}
           >
-            <strong>Career survey required.</strong> Save your interests and skills on the{' '}
+            <strong>Career survey required.</strong> Save your UG specialization (major subject), career interest path, and skills on the{' '}
             <Link to="/career-survey">career survey</Link> page first — then you can generate personalized recommendations here. Generic
             template lists are not shown until then.
           </div>
@@ -543,12 +667,6 @@ const Recommendation = () => {
               color: 'var(--text)',
             }}
           >
-            {generationSource === 'template_llm_failed' && (
-              <>
-                <strong>Cloud AI did not return careers:</strong> check model name, quota, and network in the API logs, then{' '}
-                <strong>Regenerate</strong>. Templates below are still valid.
-              </>
-            )}
             {generationSource === 'offline' && (
               <>
                 <strong>Could not reach the API.</strong> Start the backend at <code style={{ fontSize: '0.82em' }}>{API_BASE_HINT}</code>, check{' '}
@@ -608,19 +726,6 @@ const Recommendation = () => {
           </div>
         )}
 
-        {careers.length > 0 && (
-          <div style={{ marginBottom: '1rem' }}>
-            <button
-              className="btn btn-secondary"
-              onClick={handleGenerate}
-              disabled={generating}
-              style={{ marginRight: '0.5rem' }}
-            >
-              {generating ? 'Regenerating...' : 'Regenerate'}
-            </button>
-          </div>
-        )}
-
         {loading ? (
           <p style={{ color: 'var(--text-secondary)' }}>
             {fromCareerSurvey
@@ -632,17 +737,25 @@ const Recommendation = () => {
         ) : (
           <>
             <div className="rec-career-list">
-              {careers.map((career) => (
+              {careers.map((career) => {
+                const isSelected = selectedCareer?.id === career.id;
+                return (
                 <div
                   key={career.id}
-                  className={`rec-career-card${selectedCareer?.id === career.id ? ' rec-career-card--selected' : ''}`}
-                  onClick={() => setSelectedCareer(career)}
+                  ref={(el) => {
+                    if (el) cardRefs.current[career.id] = el;
+                    else delete cardRefs.current[career.id];
+                  }}
+                  className={`rec-career-card${isSelected ? ' rec-career-card--selected rec-career-card--expanded' : ''}`}
+                  onClick={() => selectCareer(career)}
                   role="button"
                   tabIndex={0}
+                  aria-expanded={isSelected}
+                  aria-controls={isSelected ? 'recommendation-detail' : undefined}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      setSelectedCareer(career);
+                      selectCareer(career);
                     }
                   }}
                 >
@@ -653,7 +766,9 @@ const Recommendation = () => {
                         <span className="rec-career-match-badge">{career.match}% Match</span>
                       </div>
                       {career.description ? (
-                        <p className="rec-career-desc">{career.description}</p>
+                        <p className={`rec-career-desc${isSelected ? ' rec-career-desc--expanded' : ''}`}>
+                          {career.description}
+                        </p>
                       ) : null}
                       <p className="rec-career-meta">
                         <span className="rec-career-meta-item">
@@ -665,6 +780,9 @@ const Recommendation = () => {
                           </span>
                         ) : null}
                       </p>
+                      {!isSelected && (
+                        <p className="rec-career-hint">Click to view skills, requirements &amp; learning path</p>
+                      )}
                     </div>
                     <div className="rec-career-actions">
                       <button
@@ -698,8 +816,20 @@ const Recommendation = () => {
                       </button>
                     </div>
                   </div>
+
+                  {isSelected && (
+                    <CareerDetailExpand
+                      career={career}
+                      onAsk={askAboutCareer}
+                      onClose={(e) => {
+                        e?.stopPropagation?.();
+                        setSelectedCareer(null);
+                      }}
+                    />
+                  )}
                 </div>
-              ))}
+              );
+              })}
             </div>
 
             {careers.length > 0 && (
@@ -710,117 +840,6 @@ const Recommendation = () => {
           </>
         )}
       </div>
-
-      {selectedCareer && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0 }}>{selectedCareer.title} - Detailed Analysis</h3>
-            <button
-              type="button"
-              onClick={() => askAboutCareer(selectedCareer.title)}
-              style={{
-                padding: '0.5rem 1rem',
-                background: 'transparent',
-                border: '1px solid var(--accent)',
-                color: 'var(--accent)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-              }}
-              title="Ask questions about this career"
-            >
-              <ChatIcon size={16} color="currentColor" />
-              Ask about this career
-            </button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-            <div>
-              <h4>Required Skills</h4>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                {(selectedCareer.skills?.length ? selectedCareer.skills : ['See learning path']).map((skill, index) => (
-                  <span
-                    key={index}
-                    style={{
-                      padding: '0.375rem 0.75rem',
-                      backgroundColor: 'rgba(13, 115, 119, 0.08)',
-                      color: 'var(--accent)',
-                      borderRadius: '20px',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                    }}
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h4>Requirements</h4>
-              <p><strong>Education:</strong> {selectedCareer.requirements.education}</p>
-              <p><strong>Experience:</strong> {selectedCareer.requirements.experience}</p>
-            </div>
-          </div>
-          {selectedCareer.learningPath?.length > 0 && (
-            <div>
-              <h4>Recommended Learning Path</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-                {selectedCareer.learningPath.map((step) => (
-                  <div
-                    key={step.step}
-                    style={{
-                      display: 'flex',
-                      gap: '1rem',
-                      padding: '1rem',
-                      backgroundColor: 'var(--bg-primary)',
-                      borderRadius: 'var(--radius-md)',
-                      borderLeft: '4px solid var(--accent)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: 'var(--accent)',
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: '600',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {step.step}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{step.title}</div>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                        Duration: {step.duration || '—'}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {radarData && (
-            <div style={{ marginTop: '2rem' }}>
-              <h4>Skill Gap Analysis</h4>
-              <div style={{ height: '400px', marginTop: '1rem' }}>
-                <Radar
-                  data={radarData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top' } },
-                    scales: { r: { beginAtZero: true, max: 5, ticks: { stepSize: 1 } } },
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Chat: opens when user clicks "Ask" on a career */}
       {careers.length > 0 && (

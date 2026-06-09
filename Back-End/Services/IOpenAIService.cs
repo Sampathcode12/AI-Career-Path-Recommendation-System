@@ -12,9 +12,9 @@ public interface IOpenAIService
     /// <summary>Model id sent to the provider (e.g. gemini-2.0-flash).</summary>
     string ConfiguredModel { get; }
 
-    /// <summary>Generate career recommendations from profile + assessment. Returns null if no LLM is configured or the call fails.</summary>
+    /// <summary>Generate career recommendations from profile + assessment.</summary>
     /// <param name="surveyMlHint">Optional text from the Colab-trained interest classifier (interests/skills).</param>
-    Task<IReadOnlyList<AICareerSuggestion>?> GenerateRecommendationsAsync(
+    Task<LlmCallResult<IReadOnlyList<AICareerSuggestion>>> GenerateRecommendationsAsync(
         string profileSummary,
         string assessmentSummary,
         CancellationToken ct = default,
@@ -35,3 +35,13 @@ public record AICareerSuggestion(
     IReadOnlyList<LearningPathStep>? LearningPath);
 
 public record LearningPathStep(int Step, string Title, string Duration);
+
+/// <summary>Result of an LLM HTTP call — carries parseable data or a user-safe failure reason.</summary>
+public sealed record LlmCallResult<T>(T? Value, string? ErrorMessage = null, int? StatusCode = null)
+{
+    public bool IsSuccess => Value != null;
+
+    public static LlmCallResult<T> Ok(T value) => new(value);
+
+    public static LlmCallResult<T> Fail(string message, int? status = null) => new(default, message, status);
+}

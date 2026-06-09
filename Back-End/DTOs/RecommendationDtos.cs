@@ -17,7 +17,10 @@ public sealed record RecommendationGenerateResponse(
     IReadOnlyList<RecommendationResponse> Recommendations,
     /// <summary>ai | survey_required (no career profile / interests+skills) | template_no_key | template_llm_failed | template_preview_only (DB unavailable — in-memory templates). Legacy: template_error.</summary>
     [property: JsonPropertyName("generation_source")]
-    string GenerationSource);
+    string GenerationSource,
+    /// <summary>When generation_source is template_llm_failed, a short reason (quota, invalid key, network, etc.).</summary>
+    [property: JsonPropertyName("generation_detail")]
+    string? GenerationDetail = null);
 
 public record RecommendationResponse(
     int Id,

@@ -1,12 +1,24 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   INTAKE_OTHER,
   UG_COURSE_OPTIONS,
   UG_SPECIALIZATION_OPTIONS,
-  getSuggestedInterestsForSpecialization,
+  getSuggestedSkillsForInterestPaths,
+  parseInterestsList,
+  parseSkillsList,
+  skillsListToText,
   intakeSelectValue,
 } from '../constants/careerIntakeOptions';
+import { intakeAPI } from '../services/api';
 import SearchableIntakeSelect from './SearchableIntakeSelect';
+
+function RequiredMark() {
+  return (
+    <span className="form-required-mark" aria-hidden="true">
+      *
+    </span>
+  );
+}
 
 function IntakeSelectWithOther({
   id,
@@ -15,6 +27,7 @@ function IntakeSelectWithOther({
   value,
   setValue,
   otherPlaceholder,
+  required = false,
 }) {
   const flatOptions = options ?? [];
   const predefinedValues = flatOptions.map((o) => o.value);
@@ -22,10 +35,14 @@ function IntakeSelectWithOther({
 
   return (
     <div className="form-group">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id}>
+        {label}
+        {required && <RequiredMark />}
+      </label>
       <select
         id={id}
         value={selectVal}
+        aria-required={required || undefined}
         onChange={(e) => {
           const v = e.target.value;
           if (v === INTAKE_OTHER) {
@@ -77,16 +94,77 @@ export default function CareerIntakeFormFields({
   idPrefix = 'rec',
 }) {
   const p = idPrefix;
+  const [skillQuery, setSkillQuery] = useState('');
+  const [interestQuery, setInterestQuery] = useState('');
+  const [interestPathOptions, setInterestPathOptions] = useState([]);
+  const [pathsLoading, setPathsLoading] = useState(false);
+  const [pathsError, setPathsError] = useState('');
 
   const specPredefinedValues = useMemo(
     () => UG_SPECIALIZATION_OPTIONS.map((o) => o.value),
     []
   );
 
-  const interestSuggestions = useMemo(
-    () => getSuggestedInterestsForSpecialization(recForm.ugSpecialization, specPredefinedValues),
-    [recForm.ugSpecialization, specPredefinedValues]
+  const hasSubject = Boolean((recForm.ugSpecialization ?? '').trim());
+
+  const interestPathValues = useMemo(
+    () => new Set(interestPathOptions.map((o) => o.value)),
+    [interestPathOptions]
   );
+
+  const selectedInterestPath = useMemo(() => {
+    const list = parseInterestsList(recForm.interests);
+    if (list.length === 0) return '';
+    const match = list.find((item) => interestPathValues.has(item));
+    return match ?? list[0];
+  }, [recForm.interests, interestPathValues]);
+
+  useEffect(() => {
+    if (!hasSubject) {
+      setInterestPathOptions([]);
+      setPathsLoading(false);
+      setPathsError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setInterestPathOptions([]);
+    const timer = window.setTimeout(async () => {
+      setPathsLoading(true);
+      setPathsError('');
+      try {
+        const res = await intakeAPI.getCareerPaths(recForm.ugSpecialization, interestQuery);
+        if (cancelled) return;
+        const raw = res.paths ?? res.Paths ?? [];
+        const options = raw.map((row) => ({
+          value: row.value ?? row.Value ?? '',
+          label: row.label ?? row.Label ?? row.value ?? row.Value ?? '',
+        })).filter((o) => o.value);
+        setInterestPathOptions(options);
+
+        if (options.length > 0) {
+          setRecForm((f) => {
+            const current = parseInterestsList(f.interests)[0] ?? '';
+            if (!current) return f;
+            if (options.some((o) => o.value === current)) return f;
+            return { ...f, interests: '' };
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setInterestPathOptions([]);
+          setPathsError(err?.message || 'Could not load career paths. Check that the API is running.');
+        }
+      } finally {
+        if (!cancelled) setPathsLoading(false);
+      }
+    }, interestQuery.trim() ? 300 : 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [hasSubject, recForm.ugSpecialization, interestQuery, setRecForm]);
 
   const specializationDisplayLabel = useMemo(() => {
     const v = (recForm.ugSpecialization ?? '').trim();
@@ -95,25 +173,84 @@ export default function CareerIntakeFormFields({
     return hit ? hit.label : v;
   }, [recForm.ugSpecialization]);
 
-  const appendInterestSuggestion = useCallback(
-    (phrase) => {
-      const pTrim = phrase.trim();
-      if (!pTrim) return;
+  const selectedInterests = useMemo(
+    () => (selectedInterestPath ? [selectedInterestPath] : []),
+    [selectedInterestPath]
+  );
+
+  const selectedSkills = useMemo(
+    () => parseSkillsList(recForm.skillsText),
+    [recForm.skillsText]
+  );
+
+  const selectedSkillKeys = useMemo(
+    () => new Set(selectedSkills.map((s) => s.toLowerCase())),
+    [selectedSkills]
+  );
+
+  const skillSuggestions = useMemo(() => {
+    const base = getSuggestedSkillsForInterestPaths(
+      recForm.interests,
+      recForm.ugSpecialization,
+      specPredefinedValues
+    );
+    const q = skillQuery.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((s) => s.toLowerCase().includes(q));
+  }, [recForm.interests, recForm.ugSpecialization, specPredefinedValues, skillQuery]);
+
+  const handleSpecializationChange = useCallback(
+    (nextSpec) => {
+      let specChanged = false;
       setRecForm((f) => {
-        const cur = f.interests.trim();
-        if (cur.toLowerCase().includes(pTrim.toLowerCase())) return f;
-        const sep = cur ? ', ' : '';
-        return { ...f, interests: `${cur}${sep}${pTrim}` };
+        const prev = (f.ugSpecialization ?? '').trim();
+        const next = (nextSpec ?? '').trim();
+        specChanged = prev.toLowerCase() !== next.toLowerCase();
+        if (!specChanged) {
+          return { ...f, ugSpecialization: nextSpec };
+        }
+        return {
+          ...f,
+          ugSpecialization: nextSpec,
+          interests: '',
+          skillsText: '',
+        };
+      });
+      if (specChanged) {
+        setInterestQuery('');
+        setSkillQuery('');
+      }
+    },
+    [setRecForm]
+  );
+
+  const handleInterestPathChange = useCallback(
+    (path) => {
+      const trimmed = path.trim();
+      if (!trimmed) return;
+      setRecForm((f) => {
+        const current = (f.interests ?? '').trim();
+        return { ...f, interests: current.toLowerCase() === trimmed.toLowerCase() ? '' : trimmed };
       });
     },
     [setRecForm]
   );
 
-  const interestsPlaceholder = useMemo(() => {
-    const v = (recForm.ugSpecialization ?? '').trim();
-    if (!v) return 'Choose your specialization above, then add interests (or type freely here)';
-    return `Career areas that fit ${specializationDisplayLabel} — use suggestions or write your own`;
-  }, [recForm.ugSpecialization, specializationDisplayLabel]);
+  const toggleSkillSuggestion = useCallback(
+    (skill) => {
+      const trimmed = skill.trim();
+      if (!trimmed) return;
+      setRecForm((f) => {
+        const list = parseSkillsList(f.skillsText);
+        const key = trimmed.toLowerCase();
+        const idx = list.findIndex((s) => s.toLowerCase() === key);
+        if (idx >= 0) list.splice(idx, 1);
+        else list.push(trimmed);
+        return { ...f, skillsText: skillsListToText(list) };
+      });
+    },
+    [setRecForm]
+  );
 
   return (
     <div className="career-intake-form career-intake-form--panel">
@@ -162,52 +299,131 @@ export default function CareerIntakeFormFields({
           label="What is your UG specialization? Major subject (e.g. Mathematics)"
           options={UG_SPECIALIZATION_OPTIONS}
           value={recForm.ugSpecialization}
-          setValue={(v) => setRecForm((f) => ({ ...f, ugSpecialization: v }))}
+          setValue={handleSpecializationChange}
           otherPlaceholder="e.g. Aerospace Engineering, Fine Arts"
+          required
         />
-        <div className="form-group career-intake-interests-block" style={{ gridColumn: '1 / -1' }}>
-          <label htmlFor={`${p}-interests`}>What are your interests?</label>
+        {hasSubject && (
+          <div className="form-group career-intake-interests-block" style={{ gridColumn: '1 / -1' }}>
+            <label htmlFor={`${p}-interest-search`}>
+              What is your career interest path?
+              <RequiredMark />
+            </label>
+            <p className="career-intake-interests-lede">
+              Search and choose one path for <strong>{specializationDisplayLabel}</strong>:
+            </p>
+            <input
+              id={`${p}-interest-search`}
+              type="search"
+              className="career-intake-skill-search"
+              value={interestQuery}
+              onChange={(e) => setInterestQuery(e.target.value)}
+              placeholder={`Search career paths for ${specializationDisplayLabel}…`}
+              autoComplete="off"
+              disabled={pathsLoading}
+            />
+            {pathsError && (
+              <p className="career-intake-interests-lede" style={{ color: 'var(--danger, #b91c1c)' }} role="alert">
+                {pathsError}
+              </p>
+            )}
+            {pathsLoading ? (
+              <p className="career-intake-interests-lede career-intake-interests-lede--hint">Loading career paths…</p>
+            ) : (
+            <div
+              className="career-intake-suggestion-chips"
+              role="radiogroup"
+              aria-label="Career interest paths"
+            >
+              {interestPathOptions.length === 0 ? (
+                <p className="career-intake-interests-lede career-intake-interests-lede--hint">
+                  {interestQuery.trim()
+                    ? 'No paths match your search — try different keywords or clear the search.'
+                    : 'No career paths found for this subject yet.'}
+                </p>
+              ) : (
+                interestPathOptions.map((o) => {
+                  const selected = selectedInterestPath.toLowerCase() === o.value.toLowerCase();
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className={`career-intake-chip${selected ? ' is-selected' : ''}`}
+                      onClick={() => handleInterestPathChange(o.value)}
+                    >
+                      {selected ? '✓ ' : ''}
+                      {o.label}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            )}
+            {selectedInterestPath ? (
+              <p className="career-intake-selected-summary">
+                <strong>Selected:</strong> {selectedInterestPath}
+              </p>
+            ) : (
+              <p className="career-intake-interests-lede career-intake-interests-lede--hint">
+                Search above, then tap a path to select it.
+              </p>
+            )}
+          </div>
+        )}
+        <div className="form-group career-intake-skills-block" style={{ gridColumn: '1 / -1' }}>
+          <label htmlFor={`${p}-skill-search`}>
+            What are your skills?
+            <RequiredMark />
+          </label>
           <p className="career-intake-interests-lede">
-            {(recForm.ugSpecialization ?? '').trim() ? (
+            {selectedInterests.length > 0 ? (
+              <>Suggestions for your selected path. Tap to add or remove; search to filter.</>
+            ) : hasSubject ? (
               <>
-                Suggestions aligned with <strong>{specializationDisplayLabel}</strong>. Tap to add; edit or type freely
-                in the box.
+                Select an interest path above for tailored skills, or pick from general skills for{' '}
+                <strong>{specializationDisplayLabel}</strong>.
               </>
             ) : (
-              <>
-                Select your <strong>UG specialization</strong> above for tailored suggestions. Until then, here are
-                general ideas you can add:
-              </>
+              <>Select your UG specialization above to unlock the interest path and tailored skill suggestions.</>
             )}
           </p>
-          <div className="career-intake-suggestion-chips" role="group" aria-label="Suggested interests">
-            {interestSuggestions.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className="career-intake-chip"
-                onClick={() => appendInterestSuggestion(s)}
-              >
-                + {s}
-              </button>
-            ))}
-          </div>
-          <textarea
-            id={`${p}-interests`}
-            rows={3}
-            value={recForm.interests}
-            onChange={(e) => setRecForm((f) => ({ ...f, interests: e.target.value }))}
-            placeholder={interestsPlaceholder}
+          <input
+            id={`${p}-skill-search`}
+            type="search"
+            className="career-intake-skill-search"
+            value={skillQuery}
+            onChange={(e) => setSkillQuery(e.target.value)}
+            placeholder="Search suggested skills…"
+            autoComplete="off"
           />
-        </div>
-        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-          <label htmlFor={`${p}-skills`}>What are your skills? (list several; separate with commas or semicolons)</label>
+          <div className="career-intake-suggestion-chips" role="group" aria-label="Suggested skills">
+            {skillSuggestions.map((s) => {
+              const selected = selectedSkillKeys.has(s.toLowerCase());
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  className={`career-intake-chip${selected ? ' is-selected' : ''}`}
+                  aria-pressed={selected}
+                  onClick={() => toggleSkillSuggestion(s)}
+                >
+                  {selected ? '✓ ' : '+ '}
+                  {s}
+                </button>
+              );
+            })}
+          </div>
+          <label htmlFor={`${p}-skills`} className="career-intake-skills-manual-label">
+            Selected skills (edit freely; comma or semicolon separated)
+          </label>
           <textarea
             id={`${p}-skills`}
-            rows={4}
+            rows={3}
             value={recForm.skillsText}
             onChange={(e) => setRecForm((f) => ({ ...f, skillsText: e.target.value }))}
-            placeholder="e.g. Python; SQL; Java — or Critical Thinking, Communication, Excel"
+            placeholder="e.g. Python; SQL; Communication — tap chips above or type here"
           />
         </div>
         <div className="form-group" style={{ gridColumn: '1 / -1' }}>

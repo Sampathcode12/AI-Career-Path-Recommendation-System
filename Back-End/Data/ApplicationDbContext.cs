@@ -17,6 +17,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<MarketTrend> MarketTrends => Set<MarketTrend>();
     public DbSet<IndustrySkillGap> IndustrySkillGaps => Set<IndustrySkillGap>();
     public DbSet<JobListing> JobListings => Set<JobListing>();
+    public DbSet<SubjectCareerPath> SubjectCareerPaths => Set<SubjectCareerPath>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +35,11 @@ public class ApplicationDbContext : DbContext
         {
             e.HasIndex(p => p.UserId).IsUnique();
             e.HasOne(p => p.User).WithOne(u => u.Profile).HasForeignKey<UserProfile>(p => p.UserId);
+        });
+        modelBuilder.Entity<SubjectCareerPath>(e =>
+        {
+            e.HasIndex(x => x.Specialization);
+            e.HasIndex(x => new { x.Specialization, x.PathLabel }).IsUnique();
         });
     }
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -34,12 +35,20 @@ public static class DataSeeder
                 .ToListAsync(ct);
             if (rows.Count == 0) break;
 
+            var updated = 0;
             foreach (var j in rows)
-                j.Country = JobLocationCountryResolver.Resolve(j.Location);
+            {
+                var country = JobLocationCountryResolver.Resolve(j.Location);
+                if (country == null) continue;
+                j.Country = country;
+                updated++;
+            }
+
+            if (updated == 0) break;
 
             await db.SaveChangesAsync(ct);
             db.ChangeTracker.Clear();
-            total += rows.Count;
+            total += updated;
         }
 
         if (total > 0)
@@ -334,6 +343,8 @@ public static class DataSeeder
 
         await SeedMarketTrendsAsync(db, env, logger, ct).ConfigureAwait(false);
 
+        await SeedSubjectCareerPathsAsync(db, env, logger, ct).ConfigureAwait(false);
+
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         await BackfillJobListingCountriesAsync(db, logger, ct).ConfigureAwait(false);
@@ -355,11 +366,77 @@ public static class DataSeeder
         }
     }
 
+    private static async Task SeedSubjectCareerPathsAsync(
+        ApplicationDbContext db,
+        IHostEnvironment env,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var existingCount = await db.SubjectCareerPaths.CountAsync(ct).ConfigureAwait(false);
+            if (existingCount >= 100)
+                return;
+            if (existingCount > 0)
+            {
+                await db.SubjectCareerPaths.ExecuteDeleteAsync(ct).ConfigureAwait(false);
+                logger.LogInformation("Cleared {Count} incomplete subject career path row(s) before re-seed", existingCount);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "SubjectCareerPaths table is not available — skipping career path seed");
+            return;
+        }
+
+        var path = Path.Combine(env.ContentRootPath, "Data", "subject-career-paths.json");
+        if (!File.Exists(path))
+        {
+            logger.LogWarning("Subject career paths file missing: {Path}", path);
+            return;
+        }
+
+        var json = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+        var rows = JsonSerializer.Deserialize<List<SubjectCareerPathFileRow>>(json, JsonOptions);
+        if (rows == null || rows.Count == 0)
+            return;
+
+        var entities = rows
+            .Where(r => !string.IsNullOrWhiteSpace(r.Specialization) && !string.IsNullOrWhiteSpace(r.PathLabel))
+            .Select(r => new SubjectCareerPath
+            {
+                Specialization = r.Specialization!.Trim(),
+                PathLabel = r.PathLabel!.Trim(),
+                SortOrder = r.SortOrder > 0 ? r.SortOrder : 0,
+            })
+            .ToList();
+
+        if (entities.Count == 0)
+        {
+            logger.LogWarning("Subject career paths JSON parsed to zero rows — check Data/subject-career-paths.json field names");
+            return;
+        }
+
+        await db.SubjectCareerPaths.AddRangeAsync(entities, ct).ConfigureAwait(false);
+        logger.LogInformation("Seeded {Count} subject career path rows from file", entities.Count);
+    }
+
     private sealed class MarketTrendFileRow
     {
         public string? Category { get; set; }
         public string? Title { get; set; }
         public string? Description { get; set; }
         public string? TrendDataJson { get; set; }
+    }
+
+    private sealed class SubjectCareerPathFileRow
+    {
+        public string? Specialization { get; set; }
+
+        [JsonPropertyName("path_label")]
+        public string? PathLabel { get; set; }
+
+        [JsonPropertyName("sort_order")]
+        public int SortOrder { get; set; }
     }
 }

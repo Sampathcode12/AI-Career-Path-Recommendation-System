@@ -21,6 +21,7 @@
   <ItemGroup>
     <None Update="Data\industry-skill-gaps.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Data\market-trends.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data\subject-career-paths.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

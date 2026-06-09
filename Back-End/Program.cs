@@ -90,6 +90,7 @@ builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<IMarketTrendsService, MarketTrendsService>();
 builder.Services.AddScoped<ISkillGapService, SkillGapService>();
+builder.Services.AddScoped<IIntakeCatalogService, IntakeCatalogService>();
 
 builder.Services.Configure<MlSettings>(builder.Configuration.GetSection("ML"));
 builder.Services.AddHttpClient();

@@ -471,3 +471,187 @@ export function getSuggestedInterestsForSpecialization(specializationValue, pred
   }
   return DEFAULT_INTEREST_SUGGESTIONS;
 }
+
+/** Dropdown/search options for career interest paths (multi-select in the UI). */
+export function getInterestPathOptionsForSpecialization(specializationValue, predefinedSpecValues) {
+  return getSuggestedInterestsForSpecialization(specializationValue, predefinedSpecValues).map((label) => ({
+    value: label,
+    label,
+  }));
+}
+
+/** All curated interest paths (search when UG subject/specialization is not selected yet). */
+export function getAllInterestPathOptions() {
+  const seen = new Set();
+  const out = [];
+  for (const list of Object.values(INTERESTS_BY_SPECIALIZATION)) {
+    for (const label of list) {
+      if (!seen.has(label)) {
+        seen.add(label);
+        out.push({ value: label, label });
+      }
+    }
+  }
+  return out.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+}
+
+/** Broad skills per major — used when interest path is not chosen yet. */
+export const SKILLS_BY_SPECIALIZATION = {
+  'Computer Science / IT': ['Python', 'Java', 'JavaScript', 'Git', 'SQL', 'Problem solving', 'Data structures'],
+  'Software Engineering': ['Java', 'C#', 'Git', 'REST APIs', 'Unit testing', 'Agile', 'System design'],
+  'Data Science / AI': ['Python', 'SQL', 'Statistics', 'Machine learning', 'Pandas', 'Data visualization', 'R'],
+  'Electronics & Communication': ['C', 'Embedded C', 'MATLAB', 'Circuit design', 'PCB layout', 'Signal processing'],
+  'Electrical Engineering': ['MATLAB', 'AutoCAD', 'PLC programming', 'Power systems', 'Control systems'],
+  'Mechanical Engineering': ['AutoCAD', 'SolidWorks', 'CAD/CAM', 'Thermodynamics', 'FEA', 'Manufacturing processes'],
+  'Civil Engineering': ['AutoCAD', 'STAAD.Pro', 'Revit', 'Surveying', 'Project estimation', 'Structural analysis'],
+  'Information Technology': ['Networking', 'Windows Server', 'Linux', 'SQL', 'Cloud basics', 'IT support'],
+  Mathematics: ['MATLAB', 'R', 'Statistics', 'LaTeX', 'Mathematical modeling', 'Python', 'Problem solving'],
+  Physics: ['Python', 'MATLAB', 'Lab techniques', 'Data analysis', 'Scientific writing', 'Statistics'],
+  Chemistry: ['Lab techniques', 'HPLC', 'Spectroscopy', 'Safety compliance', 'Research methods', 'Excel'],
+  'Biotechnology / Life Sciences': ['PCR', 'Cell culture', 'Bioinformatics', 'Lab safety', 'Research methods', 'Python'],
+  'Commerce / Accounting': ['Excel', 'Tally', 'Financial accounting', 'GST/Tax basics', 'Bookkeeping', 'Attention to detail'],
+  'Finance / Banking': ['Excel', 'Financial modeling', 'Accounting', 'Bloomberg basics', 'Risk analysis', 'PowerPoint'],
+  'Marketing': ['SEO', 'Google Analytics', 'Content writing', 'Social media', 'Market research', 'Canva'],
+  'Human Resources': ['Recruitment', 'HRIS', 'Communication', 'Conflict resolution', 'Excel', 'Labor law basics'],
+  Economics: ['Statistics', 'Econometrics', 'Excel', 'Stata/R', 'Research writing', 'Data analysis'],
+  Psychology: ['Research methods', 'Statistics', 'Counseling basics', 'SPSS', 'Communication', 'Ethics'],
+  'English / Literature': ['Writing', 'Editing', 'Research', 'Communication', 'Critical analysis', 'CMS/AP style'],
+  'Journalism / Media': ['Writing', 'Video editing', 'Photography', 'Social media', 'Research', 'Adobe Premiere'],
+  Nursing: ['Patient care', 'Vital signs', 'Electronic health records', 'Clinical documentation', 'Communication'],
+  Pharmacy: ['Pharmacology', 'Dosage calculation', 'Patient counseling', 'Inventory management', 'Regulatory compliance'],
+  Law: ['Legal research', 'Drafting', 'Case analysis', 'Communication', 'Negotiation', 'Compliance'],
+  'General / Undeclared': ['Communication', 'Excel', 'Problem solving', 'Teamwork', 'Critical thinking', 'Presentation'],
+};
+
+export const GENERAL_SKILL_SUGGESTIONS = [
+  'Communication',
+  'Problem solving',
+  'Teamwork',
+  'Critical thinking',
+  'Time management',
+  'Microsoft Excel',
+  'Presentation skills',
+  'Adaptability',
+];
+
+/** Explicit skills for common interest paths (overrides keyword inference). */
+export const SKILLS_BY_INTEREST_PATH = {
+  'Software development': ['Python', 'Java', 'JavaScript', 'Git', 'REST APIs', 'Debugging', 'Object-oriented design'],
+  'Web & mobile applications': ['HTML/CSS', 'JavaScript', 'React', 'Responsive design', 'REST APIs', 'Git'],
+  'Cloud computing': ['AWS', 'Azure', 'Docker', 'Kubernetes', 'Linux', 'Networking', 'Terraform'],
+  Cybersecurity: ['Network security', 'Linux', 'Python', 'SIEM', 'Penetration testing basics', 'Incident response'],
+  'Machine learning': ['Python', 'Scikit-learn', 'TensorFlow/PyTorch', 'Statistics', 'Feature engineering', 'SQL'],
+  'Data analysis & visualization': ['Python', 'SQL', 'Excel', 'Tableau/Power BI', 'Statistics', 'Pandas'],
+  'Digital marketing': ['SEO', 'Google Analytics', 'Content strategy', 'Social media ads', 'Copywriting', 'Canva'],
+  'Financial modeling': ['Excel', 'Financial statements', 'Valuation', 'PowerPoint', 'Accounting', 'Forecasting'],
+  'Patient care': ['Vital signs', 'Clinical documentation', 'Communication', 'Empathy', 'Infection control'],
+  'Product design & CAD': ['SolidWorks', 'AutoCAD', '3D modeling', 'GD&T', 'Technical drawing', 'FEA basics'],
+  'Talent acquisition': ['Sourcing', 'Interviewing', 'LinkedIn Recruiter', 'Communication', 'ATS tools', 'Employer branding'],
+};
+
+/** Parse comma/semicolon-separated skills text into a de-duplicated list. */
+export function parseSkillsList(text) {
+  const seen = new Set();
+  const out = [];
+  for (const part of (text ?? '').split(/[,;]+/)) {
+    const s = part.trim();
+    if (!s) continue;
+    const key = s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+export function skillsListToText(skills) {
+  return skills.filter(Boolean).join(', ');
+}
+
+/** Same delimiter rules as skills — interests are stored comma-separated in the profile. */
+export const parseInterestsList = parseSkillsList;
+
+export function interestsListToText(items) {
+  return skillsListToText(items);
+}
+
+function inferSkillsFromInterestText(interestPath) {
+  const lower = interestPath.toLowerCase();
+  if (/software|web|mobile|api|devops|agile|microservice|testing|quality|open source|systems|network|hci|cloud/.test(lower)) {
+    return ['Python', 'JavaScript', 'Git', 'Problem solving', 'REST APIs', 'Debugging'];
+  }
+  if (/machine learning|data analysis|nlp|mlops|statistics|ai|visualization|bioinformatics|modeling/.test(lower)) {
+    return ['Python', 'SQL', 'Statistics', 'Data visualization', 'Machine learning', 'Pandas'];
+  }
+  if (/marketing|brand|content|social|seo|growth|campaign|storytelling|media|journalism|broadcast|pr/.test(lower)) {
+    return ['Communication', 'Writing', 'Market research', 'Social media', 'Analytics', 'Creativity'];
+  }
+  if (/finance|banking|investment|accounting|audit|tax|modeling|risk|wealth|fintech/.test(lower)) {
+    return ['Excel', 'Financial analysis', 'Accounting', 'Attention to detail', 'PowerPoint'];
+  }
+  if (/legal|law|litigation|compliance|intellectual property|policy/.test(lower)) {
+    return ['Legal research', 'Drafting', 'Case analysis', 'Communication', 'Critical thinking'];
+  }
+  if (/nurs|patient|clinical|pharm|health|medical|community health|telehealth/.test(lower)) {
+    return ['Patient care', 'Communication', 'Clinical documentation', 'Empathy', 'Teamwork'];
+  }
+  if (/teach|education|classroom|curriculum|academic|esl/.test(lower)) {
+    return ['Lesson planning', 'Communication', 'Subject knowledge', 'Classroom management', 'Assessment'];
+  }
+  if (/hr|talent|recruit|employee|compensation|organizational/.test(lower)) {
+    return ['Communication', 'Interviewing', 'Excel', 'Conflict resolution', 'HRIS'];
+  }
+  if (/design|ux|cad|product design|figma|wireframe|prototype/.test(lower)) {
+    return ['Figma/Sketch', 'User research', 'Wireframing', 'Prototyping', 'Visual design'];
+  }
+  if (/engineer|mechanical|electrical|civil|embedded|iot|power|manufacturing|structural|automotive|robotics/.test(lower)) {
+    return ['AutoCAD/SolidWorks', 'Technical drawing', 'Problem solving', 'MATLAB', 'Project documentation'];
+  }
+  if (/research|r&d|lab|science|physics|chemistry|biotech|genomics/.test(lower)) {
+    return ['Research methods', 'Data analysis', 'Scientific writing', 'Lab techniques', 'Statistics'];
+  }
+  return GENERAL_SKILL_SUGGESTIONS;
+}
+
+/**
+ * Skills to suggest from one or more interest paths (comma-separated) and optional UG subject.
+ * @param {string | undefined} interestsText - comma/semicolon-separated interest paths
+ * @param {string | undefined} specializationValue - UG major/subject
+ * @param {string[]} predefinedSpecValues
+ */
+export function getSuggestedSkillsForInterestPaths(interestsText, specializationValue, predefinedSpecValues) {
+  const paths = parseInterestsList(interestsText);
+  if (paths.length === 0) {
+    return getSuggestedSkillsForInterestPath('', specializationValue, predefinedSpecValues);
+  }
+  const seen = new Set();
+  const merged = [];
+  for (const path of paths) {
+    for (const skill of getSuggestedSkillsForInterestPath(path, '', predefinedSpecValues)) {
+      const key = skill.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(skill);
+    }
+  }
+  return merged.length > 0 ? merged : GENERAL_SKILL_SUGGESTIONS;
+}
+
+/**
+ * Skills to suggest after the user picks one interest path (and optional UG subject).
+ * @param {string | undefined} interestPath - single selected interest
+ * @param {string | undefined} specializationValue - UG major/subject
+ * @param {string[]} predefinedSpecValues
+ */
+export function getSuggestedSkillsForInterestPath(interestPath, specializationValue, predefinedSpecValues) {
+  const interest = (interestPath ?? '').trim();
+  if (interest) {
+    if (SKILLS_BY_INTEREST_PATH[interest]) return SKILLS_BY_INTEREST_PATH[interest];
+    return inferSkillsFromInterestText(interest);
+  }
+  const spec = (specializationValue ?? '').trim();
+  if (spec && predefinedSpecValues.includes(spec) && SKILLS_BY_SPECIALIZATION[spec]) {
+    return SKILLS_BY_SPECIALIZATION[spec];
+  }
+  return GENERAL_SKILL_SUGGESTIONS;
+}

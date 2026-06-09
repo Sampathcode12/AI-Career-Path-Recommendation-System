@@ -8,6 +8,8 @@ import {
   buildInitialRecForm,
   saveCareerIntakeDraft,
   normalizeRecFormIntakeFields,
+  isCareerIntakeComplete,
+  getCareerIntakeMissingFields,
 } from '../careerIntakeUtils';
 import CareerIntakeFormFields from '../components/CareerIntakeFormFields';
 import './PageStyles.css';
@@ -37,18 +39,12 @@ const CareerSurvey = () => {
 
   const persistRecProfile = useCallback(async (form, snap) => {
     const payload = buildProfilePayloadFromRecForm(form, snap);
-    if (snap) {
-      const updated = await profileAPI.update(payload);
-      setProfileSnapshot(updated);
-    } else {
-      const created = await profileAPI.create({
-        ...payload,
-        preferredIndustries: payload.preferredIndustries || 'technology',
-        interests: payload.interests || 'General / exploring careers',
-        skills: payload.skills || 'Not specified',
-      });
-      setProfileSnapshot(created);
-    }
+    const saved = await profileAPI.update({
+      ...payload,
+      preferred_industries: payload.preferred_industries || 'technology',
+    });
+    setProfileSnapshot(saved);
+    return saved;
   }, []);
 
   useEffect(() => {
@@ -90,8 +86,12 @@ const CareerSurvey = () => {
   }, [recForm, profileFormLoading, user]);
 
   const validateIntake = () => {
+    if (!recForm.ugSpecialization?.trim()) {
+      setRecFormError('Please select your UG specialization (major subject).');
+      return false;
+    }
     if (!recForm.interests?.trim()) {
-      setRecFormError('Please describe your interests.');
+      setRecFormError('Please select your career interest path.');
       return false;
     }
     if (!recForm.skillsText?.trim()) {
@@ -133,22 +133,39 @@ const CareerSurvey = () => {
     }
   };
 
-  const handleSaveOnly = async () => {
-    setRecFormError('');
-    setSaveMessage('');
-    if (!validateIntake()) return;
-    setSavingIntake(true);
-    try {
-      await persistRecProfile(recForm, profileSnapshot);
+  const finalizeSavedProfile = useCallback(
+    async (saved) => {
+      if (!isCareerIntakeComplete(saved)) {
+        const missing = getCareerIntakeMissingFields(saved);
+        throw new Error(
+          `Survey did not save completely. Missing on your profile: ${missing.join(', ')}. Fill those fields and click Save again.`
+        );
+      }
       try {
         const refreshed = await profileAPI.get();
         setProfileSnapshot(refreshed);
         const nextForm = normalizeRecFormIntakeFields(mapProfileToRecForm(refreshed, user));
         setRecForm(nextForm);
         saveCareerIntakeDraft(user, nextForm);
+        return refreshed;
       } catch {
-        /* ignore */
+        const nextForm = normalizeRecFormIntakeFields(mapProfileToRecForm(saved, user));
+        setRecForm(nextForm);
+        saveCareerIntakeDraft(user, nextForm);
+        return saved;
       }
+    },
+    [user]
+  );
+
+  const handleSaveOnly = async () => {
+    setRecFormError('');
+    setSaveMessage('');
+    if (!validateIntake()) return;
+    setSavingIntake(true);
+    try {
+      const saved = await persistRecProfile(recForm, profileSnapshot);
+      await finalizeSavedProfile(saved);
       localStorage.setItem('assessmentCompleted', 'true');
       markCareerProfileNeedsRecommendationRefresh();
       setSaveMessage('Saved to your profile.');
@@ -166,16 +183,8 @@ const CareerSurvey = () => {
     if (!validateIntake()) return;
     setSavingIntake(true);
     try {
-      await persistRecProfile(recForm, profileSnapshot);
-      try {
-        const refreshed = await profileAPI.get();
-        setProfileSnapshot(refreshed);
-        const nextForm = normalizeRecFormIntakeFields(mapProfileToRecForm(refreshed, user));
-        setRecForm(nextForm);
-        saveCareerIntakeDraft(user, nextForm);
-      } catch {
-        /* ignore */
-      }
+      const saved = await persistRecProfile(recForm, profileSnapshot);
+      await finalizeSavedProfile(saved);
       localStorage.setItem('assessmentCompleted', 'true');
       markCareerProfileNeedsRecommendationRefresh();
       navigate('/recommendation', { state: { fromCareerSurvey: true } });

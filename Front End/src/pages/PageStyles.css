@@ -59,6 +59,12 @@
   font-size: 0.9375rem;
 }
 
+.form-required-mark {
+  color: var(--danger, #b91c1c);
+  font-weight: 700;
+  margin-left: 0.15em;
+}
+
 input,
 select,
 textarea {
@@ -1677,6 +1683,17 @@ strong {
   line-height: 1.45;
 }
 
+.career-intake-interests-block--locked {
+  padding: 0.85rem 1rem;
+  border: 1px dashed var(--border-light, rgba(0, 0, 0, 0.12));
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-page, rgba(0, 0, 0, 0.02));
+}
+
+.career-intake-interests-block--locked .career-intake-interests-lede--hint {
+  margin: 0;
+}
+
 .career-intake-suggestion-chips {
   display: flex;
   flex-wrap: wrap;
@@ -1701,6 +1718,49 @@ button.career-intake-chip:hover {
   background: rgba(13, 115, 119, 0.08);
   border-color: var(--accent);
   box-shadow: none;
+}
+
+button.career-intake-chip.is-selected {
+  background: rgba(13, 115, 119, 0.14);
+  border-color: var(--accent);
+  color: var(--accent-dark, #0a5c5f);
+  font-weight: 600;
+}
+
+.career-intake-skill-search {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+
+.career-intake-skills-manual-label {
+  display: block;
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.career-intake-custom-interest__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.career-intake-custom-interest__row input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.career-intake-selected-summary {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
 }
 
 .review-section {
