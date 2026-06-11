@@ -16,6 +16,8 @@ function resolveBuildApiBaseUrl(envFromFiles) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const buildApiBase = resolveBuildApiBaseUrl(env)
+  const vercelApiProxy =
+    env.VITE_VERCEL_API_PROXY === '1' || process.env.VITE_VERCEL_API_PROXY === '1'
 
   // Vercel sets VERCEL_URL on every build; VERCEL=1 is not always visible in nested npm scripts on some setups.
   const buildingOnVercel =
@@ -26,12 +28,14 @@ export default defineConfig(({ mode }) => {
     mode === 'production' &&
     buildingOnVercel &&
     !buildApiBase &&
+    !vercelApiProxy &&
     process.env.VERCEL_SKIP_API_ENV_CHECK !== '1'
   ) {
     console.warn(
-      '[vite] Vercel production build: VITE_API_BASE_URL / BACKEND_API_BASE_URL is not set. ' +
-        'The app will call same-origin /api (add vercel.json rewrites to your API, or set those env vars and redeploy). ' +
-        'To silence this warning only when /api is proxied: VERCEL_SKIP_API_ENV_CHECK=1.'
+      '[vite] Vercel production build: BACKEND_API_BASE_URL / VITE_API_BASE_URL is not set. ' +
+        'Add BACKEND_API_BASE_URL in Vercel env vars (Railway/Azure API URL) and redeploy, ' +
+        'or set VITE_API_BASE_URL to call the API directly. ' +
+        'To silence this warning only: VERCEL_SKIP_API_ENV_CHECK=1.'
     )
   }
 
@@ -44,6 +48,7 @@ export default defineConfig(({ mode }) => {
   return {
     define: {
       __BUILD_API_BASE__: JSON.stringify(buildApiBase),
+      __VERCEL_API_PROXY__: JSON.stringify(vercelApiProxy),
     },
     plugins: [react()],
     server: {

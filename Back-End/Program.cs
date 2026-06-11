@@ -127,7 +127,15 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(corsOrigins)
+        policy.SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrWhiteSpace(origin)) return false;
+                if (corsOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase)) return true;
+                if (Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+                    && uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                return false;
+            })
             .AllowAnyHeader()
             .AllowAnyMethod();
     });

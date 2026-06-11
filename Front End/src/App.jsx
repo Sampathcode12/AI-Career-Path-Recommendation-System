@@ -26,8 +26,8 @@ const AppRoutes = () => {
     <div className="app">
       {isDeployedWithoutExplicitApiBase() && (
         <div className="deployment-api-banner" role="alert">
-          <strong>This Vercel URL only hosts the React app.</strong> Log in, recommendations, and other features need
-          your .NET API running on a separate public host (Vercel does not run that backend for this project).{' '}
+          <strong>Backend API is not connected yet.</strong> This Vercel site serves the React app; the .NET API must
+          run on Railway or Azure from the same repository.{' '}
           <span style={{ whiteSpace: 'normal' }}>{getProductionApiSetupHint()}</span>
         </div>
       )}

@@ -30,17 +30,26 @@ function resolveApiBaseUrl() {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+function isVercelProxyBuild() {
+  try {
+    return typeof __VERCEL_API_PROXY__ !== 'undefined' && __VERCEL_API_PROXY__ === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Full configured API base path (for UI hints). Same as requests use. */
 export function getResolvedApiBaseUrl() {
   return API_BASE_URL;
 }
 
 /**
- * True when this is a production build still using same-origin `/api` on a public host.
- * Means no build-time URL, no VITE_API_BASE_URL at build, and no PRODUCTION_API_FALLBACK — requests hit the static host and 404.
+ * True when this is a production build still using same-origin `/api` on a public host
+ * without a Vercel proxy or explicit API URL — requests would 404 on a static-only deploy.
  */
 export function isDeployedWithoutExplicitApiBase() {
   if (!import.meta.env.PROD) return false;
+  if (isVercelProxyBuild()) return false;
   if (API_BASE_URL !== '/api') return false;
   if (typeof window === 'undefined') return false;
   const h = window.location.hostname || '';
@@ -48,13 +57,12 @@ export function isDeployedWithoutExplicitApiBase() {
   return true;
 }
 
-/** Short instructions for connecting a hosted .NET API (no Vercel env vars required). */
+/** Short instructions for connecting a hosted .NET API on Vercel. */
 export function getProductionApiSetupHint() {
   return (
-    'Host your .NET API on a public URL (e.g. Azure App Service free tier), then in the repo open ' +
-    'Front End/src/config/productionApiFallback.js and set PRODUCTION_API_FALLBACK to that origin ' +
-    '(example: https://your-api.azurewebsites.net). Commit and push so Vercel rebuilds. ' +
-    'Allow CORS on the API for this site’s origin. Alternatively set VITE_API_BASE_URL in Vercel Environment Variables.'
+    'For full Vercel hosting: set MONGODB_URI (MongoDB Atlas free) in Vercel Environment Variables and redeploy. ' +
+    'Auth is on Vercel serverless; other features migrate in phases. ' +
+    'Optional: BACKEND_API_BASE_URL still proxies unported routes to Render/.NET.'
   );
 }
 

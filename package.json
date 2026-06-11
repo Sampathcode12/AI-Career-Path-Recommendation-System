@@ -1,11 +1,18 @@
 {
   "name": "ai-career-path-recommendation-system",
   "private": true,
-  "description": "Root scripts — React app lives in \"Front End\"",
+  "type": "module",
+  "description": "React (Front End) + Vercel serverless API (api/) — optional legacy .NET on Render",
   "scripts": {
     "dev": "npm run dev --prefix \"Front End\"",
-    "build": "npm run build --prefix \"Front End\"",
+    "build": "node scripts/prepare-vercel.mjs && npm run build --prefix \"Front End\"",
     "install:front": "npm install --prefix \"Front End\"",
+    "install:all": "npm install && npm install --prefix \"Front End\"",
     "lint": "npm run lint --prefix \"Front End\""
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.12.0"
   }
 }
