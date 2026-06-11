@@ -2,6 +2,11 @@
   "installCommand": "npm install && npm install --prefix \"Front End\"",
   "buildCommand": "node scripts/prepare-vercel.mjs && npm run build --prefix \"Front End\"",
   "outputDirectory": "Front End/dist",
+  "functions": {
+    "api/[...path].js": {
+      "includeFiles": "server/data/**"
+    }
+  },
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]

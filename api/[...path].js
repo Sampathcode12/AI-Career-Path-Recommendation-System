@@ -1,4 +1,4 @@
-import { dispatch } from './router.js';
+import { dispatch } from '../server/router.js';
 
 export default async function handler(req, res) {
   const pathParts = req.query.path;
