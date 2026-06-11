@@ -26,8 +26,7 @@ const AppRoutes = () => {
     <div className="app">
       {isDeployedWithoutExplicitApiBase() && (
         <div className="deployment-api-banner" role="alert">
-          <strong>Backend API is not connected yet.</strong> This Vercel site serves the React app; the .NET API must
-          run on Railway or Azure from the same repository.{' '}
+          <strong>Backend API is not connected yet.</strong> This deploy is static-only until MongoDB is configured.{' '}
           <span style={{ whiteSpace: 'normal' }}>{getProductionApiSetupHint()}</span>
         </div>
       )}

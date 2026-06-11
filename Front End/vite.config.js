@@ -17,7 +17,9 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const buildApiBase = resolveBuildApiBaseUrl(env)
   const vercelApiProxy =
-    env.VITE_VERCEL_API_PROXY === '1' || process.env.VITE_VERCEL_API_PROXY === '1'
+    env.VITE_VERCEL_API_PROXY === '1' ||
+    process.env.VITE_VERCEL_API_PROXY === '1' ||
+    (buildingOnVercel && mode === 'production')
 
   // Vercel sets VERCEL_URL on every build; VERCEL=1 is not always visible in nested npm scripts on some setups.
   const buildingOnVercel =
@@ -49,6 +51,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __BUILD_API_BASE__: JSON.stringify(buildApiBase),
       __VERCEL_API_PROXY__: JSON.stringify(vercelApiProxy),
+      __VERCEL_NATIVE_API__: JSON.stringify(buildingOnVercel && mode === 'production'),
     },
     plugins: [react()],
     server: {

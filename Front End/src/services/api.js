@@ -38,6 +38,14 @@ function isVercelProxyBuild() {
   }
 }
 
+function isVercelNativeBuild() {
+  try {
+    return typeof __VERCEL_NATIVE_API__ !== 'undefined' && __VERCEL_NATIVE_API__ === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Full configured API base path (for UI hints). Same as requests use. */
 export function getResolvedApiBaseUrl() {
   return API_BASE_URL;
@@ -49,7 +57,7 @@ export function getResolvedApiBaseUrl() {
  */
 export function isDeployedWithoutExplicitApiBase() {
   if (!import.meta.env.PROD) return false;
-  if (isVercelProxyBuild()) return false;
+  if (isVercelProxyBuild() || isVercelNativeBuild()) return false;
   if (API_BASE_URL !== '/api') return false;
   if (typeof window === 'undefined') return false;
   const h = window.location.hostname || '';
@@ -60,9 +68,8 @@ export function isDeployedWithoutExplicitApiBase() {
 /** Short instructions for connecting a hosted .NET API on Vercel. */
 export function getProductionApiSetupHint() {
   return (
-    'For full Vercel hosting: set MONGODB_URI (MongoDB Atlas free) in Vercel Environment Variables and redeploy. ' +
-    'Auth is on Vercel serverless; other features migrate in phases. ' +
-    'Optional: BACKEND_API_BASE_URL still proxies unported routes to Render/.NET.'
+    'Set MONGODB_URI (MongoDB Atlas free tier) in Vercel → Settings → Environment Variables, then redeploy. ' +
+    'The app runs fully on Vercel serverless + MongoDB — no Railway or Render required.'
   );
 }
 

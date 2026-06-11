@@ -1,19 +1,8 @@
 import bcrypt from 'bcryptjs';
-import { getDb, ensureIndexes } from '../lib/mongodb.js';
+import { prepareDb } from '../lib/db.js';
 import { nextSequence } from '../lib/counters.js';
 import { signUserToken, verifyBearerToken } from '../lib/jwt.js';
 import { readJsonBody, sendJson } from '../lib/http.js';
-
-let indexesReady = false;
-
-async function prepareDb() {
-  const db = await getDb();
-  if (!indexesReady) {
-    await ensureIndexes();
-    indexesReady = true;
-  }
-  return db;
-}
 
 function publicUser(row) {
   return { id: row.id, name: row.name, email: row.email };

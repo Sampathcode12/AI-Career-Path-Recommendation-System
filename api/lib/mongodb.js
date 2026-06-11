@@ -33,4 +33,9 @@ export async function ensureIndexes() {
   const db = await getDb();
   await db.collection('users').createIndex({ email: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
   await db.collection('users').createIndex({ id: 1 }, { unique: true });
+  await db.collection('user_profiles').createIndex({ user_id: 1 }, { unique: true });
+  await db.collection('user_profiles').createIndex({ id: 1 }, { unique: true });
+  await db.collection('assessments').createIndex({ user_id: 1, created_at: -1 });
+  await db.collection('career_recommendations').createIndex({ user_id: 1, sort_order: 1 });
+  await db.collection('saved_jobs').createIndex({ user_id: 1, saved_at: -1 });
 }

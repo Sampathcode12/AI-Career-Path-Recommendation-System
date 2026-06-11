@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+const onVercel = !!(process.env.VERCEL === '1' || process.env.VERCEL_URL);
 const mongo = (process.env.MONGODB_URI || process.env.DATABASE_URL || '').trim();
 const backend = (
   process.env.BACKEND_API_BASE_URL ||
@@ -15,10 +16,13 @@ const backend = (
 
 const envPath = path.join('Front End', '.env.production.local');
 
-if (mongo || backend) {
+if (onVercel || mongo || backend) {
   fs.writeFileSync(envPath, 'VITE_VERCEL_API_PROXY=1\n', 'utf8');
+  if (onVercel) {
+    console.log('[prepare-vercel] Vercel build — same-origin /api serverless handlers enabled.');
+  }
   if (mongo) {
-    console.log('[prepare-vercel] Native Vercel API enabled (MONGODB_URI set).');
+    console.log('[prepare-vercel] MongoDB configured — full native API.');
   }
   if (backend) {
     const display = backend.replace(/\/api\/?$/i, '').replace(/\/+$/, '');
