@@ -3,11 +3,12 @@
   "buildCommand": "node scripts/prepare-vercel.mjs && npm run build --prefix \"Front End\"",
   "outputDirectory": "Front End/dist",
   "functions": {
-    "api/[...path].js": {
-      "includeFiles": "server/data/**"
+    "api/index.js": {
+      "includeFiles": "server/**"
     }
   },
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": "/api?path=$1" },
+    { "source": "/((?!api).*)", "destination": "/index.html" }
   ]
 }
